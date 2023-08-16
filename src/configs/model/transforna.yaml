@@ -1,0 +1,9 @@
+skorch_model:
+  _target_: src.transforna.model.skorchWrapper.Net
+  module: src.transforna.model.model_components.GeneEmbeddModel
+  criterion: src.transforna.callbacks.criterion.LossFunction
+  max_epochs: 0 #infered from task specific train config
+  optimizer: torch.optim.AdamW
+  device: cuda
+  batch_size: 64
+  iterator_train__shuffle: True

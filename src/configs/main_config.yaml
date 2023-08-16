@@ -1,0 +1,35 @@
+defaults: 
+  - model: transforna
+  - inference_settings: default
+  
+task: tcga # tcga,sncrna or premirna
+
+#train settings
+model_name: seq #seq, seq-seq, seq-struct, seq-reverse, seq-exp or baseline
+trained_on: full #full or id
+inference: False   # True or False
+#if inference is true, should the logits be logged?
+log_logits: False
+
+
+train_split: True  # True or False
+valid_size: 0.15   # 0 < valid_size < 1
+
+#CV
+cross_val: True    # True or False
+num_replicates: 1  # Integer, num_replicates > 1
+
+#seed
+seed: 1            # Integer
+device_number: 1   # Integer, select GPU
+
+
+#logging sequence embeddings + metrics to tensorboard
+log_embedds: True  # True or False
+tensorboard: False  # True or False
+
+#disable hydra output
+#hydra:  
+#  output_subdir: null  
+#  run:  
+#    dir: .

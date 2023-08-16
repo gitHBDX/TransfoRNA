@@ -1,0 +1,16 @@
+anndata:
+  obs:
+    numerical_columns:
+    - length
+    # These are columns that will be parsed with pd.to_datetime
+    datetime_columns:
+    - None
+    # These are columns which only contain strings but should not be set as categorical!
+    string_columns:
+    - snRNA_name
+    # These are the columns which contain numerical values but should be treated as categorical variables
+    numerical_categorical_columns:
+    - None
+  var:
+    boolean_columns:
+    - spikein
