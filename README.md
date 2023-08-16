@@ -1,9 +1,9 @@
 # TransfoRNA
-TransfoRNA is a **Bioinformatics** and **machine learning** tool based on **Transformers** to provide annotations for 7 major classes (miRNA, rRNA, tRNA, snoRNA, protein 
--coding/mRNA, lncRNA, and YRNA) and 252 sub-classes 
+TransfoRNA is a **Bioinformatics** and **machine learning** tool based on **Transformers** to provide annotations for 11 major classes (miRNA, rRNA, tRNA, snoRNA, protein 
+-coding/mRNA, lncRNA, and YRNA, piRNA,snRNA,snoRNA and vtRNA) and 1225 sub-classes 
 for **small RNAs and RNA fragments**. These are typically found in RNA-seq NGS (next generation sequencing) data.
 
-TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure and expression. The result is a major and sub-class assignment combined with a novelty score (logit entropy) that indicated whether the RNA is similar to ones observed during training. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based Bioinformatics tools, including the mapping to databases and the human genome. 
+TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure and expression. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenestein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it deceids if the query sequene is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based Bioinformatics tools, including the mapping to databases and the human genome. 
 
  
 ## Dataset (Objective):
@@ -16,7 +16,7 @@ TransfoRNA can be trained on just the RNA sequences and optionally on additional
   - An additional **artificial affix set, AA** contains 788 sequences known to be technical artefacts.
     
 ## Models
-There are 6 models currently available, each with different input encoders.
+There are 5 models currently available, each with different input encoders.
  - Baseline: 
     - Input: (single input) Sequence
     - Model: An embedding layer that converts sequences into vectors followed by a classification feed forward layer.
@@ -29,14 +29,12 @@ There are 6 models currently available, each with different input encoders.
  - Seq-Struct:
     - Input: (dual inputs) Sequence + Secondary structure
     - Model: A transformer encoder for the sequence and another for the secondary structure.
- - Seq-Exp:
-    - Input: (dual inputs) Sequence + Expression of sequence accross control tissues of 480 patients
-    - Model: A transformer encoder for the sequence and another for the expression.
  - Seq-Rev (best performant):
     - Input: (dual inputs) Sequence
     - Model: A transformer encoder for the sequence and another for the sequence reversed.
     
-<img width="1194" alt="Screenshot 2022-12-14 at 10 44 47" src="https://user-images.githubusercontent.com/82571392/207561654-7de49269-6be6-40f2-b7fb-9921d01496df.png">
+<img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
+
 
     
 ## Repo Structure
@@ -54,7 +52,7 @@ There are 6 models currently available, each with different input encoders.
 
 ## Installation
 
- The `environments.yml` includes all the required packages for TransfoRNA installation. Edit the `prefix` key to point to the conda folder, then run:
+ The `environment.yml` includes all the required packages for TransfoRNA installation. Edit the `prefix` key to point to the conda folder, then run:
  
  ```
  conda env create -f environment.yml
