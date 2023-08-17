@@ -1288,6 +1288,8 @@ def prepare_inference_data(cfg,ad,dataset_class):
     return all_data
 
 def get_model(cfg,path):
+    root_path = str(Path(__file__).parents[3])
+    cfg['inference_settings']['model_path'] = root_path+'/'+cfg['inference_settings']['model_path']
     cfg["model_config"] = get_hp_setting(cfg,'model_config')
 
     #set seed and update skorch config

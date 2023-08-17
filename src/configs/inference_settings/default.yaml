@@ -1,3 +1,3 @@
 infere_original_testset: false
-model_path: models/TransfoRNA_FULL/sub_class/Seq/ckpt/model_params_tcga.pt
+model_path: models/tcga/TransfoRNA_FULL/sub_class/Seq/ckpt/model_params_tcga.pt
 sequences_path: inference_set

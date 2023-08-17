@@ -65,16 +65,16 @@ There are 5 models currently available, each with different input encoders.
 ## Inference
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
-  - `model_path`: The full path of the model.
+  - `model_path`: The full path of the model. (currently this points to the Seq model)
   
 Also in the `main_config.yaml`, make sure to edit the `model_name` to match the input expected by the loaded model.
   - `model_name`: add the name of the model. One of `"seq"`,`"seq-seq"`,`"seq-struct"`,`"baseline"` or `"seq-reverse"` (see above)
 
 
-Then, run the following command:
+Then, navigate the repositories' root directory and run the following command:
 
 ```
-python main.py inference=True
+python src/main.py inference=True
 ```
 
 ## Train
@@ -82,18 +82,18 @@ TransfoRNA requires the input data to be in the form of an Anndata, `ad`, where 
 
 For training TransfoRNA from the root directory: 
 ```
-python main.py
+python src/main.py
 ```
 Using [Hydra](https://hydra.cc/), any option in the main config can be changed. For instance, to train a Seq-Struct TransfoRNA model without using a validation split:
 ```
-python main.py train_split=False model_name='seq-struct'
+python src/main.py train_split=False model_name='seq-struct'
 ```
 After training, an output folder is automatically created in the root directory where training is logged. 
 The structure of the output folder is chosen by hydra to be `/day/time/results folders`. Results folders are a set of folders created during training:
 - `ckpt`: (containing the latest checkpoint of the model)
 - `embedds`:
   - Contains a file per each split (train/valid/test/ood/na).
-  - Each file is a `csv` containing the sequences plus their embeddings (obtained by the model) as well as the logits. The logits are values the models produce for each sequence, reflecting its confidence of a sequence belonging to a certain class.
+  - Each file is a `csv` containing the sequences plus their embeddings (obtained by the model and represent numeric representation of a given RNA sequence) as well as the logits. The logits are values the models produce for each sequence, reflecting its confidence of a sequence belonging to a certain class.
 - `meta`: A folder containing a `yaml` file with all the hyperparameters used for the current run. 
 
 
