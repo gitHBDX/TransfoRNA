@@ -66,6 +66,8 @@ There are 5 models currently available, each with different input encoders.
   - `predict_transforna` : Computes for a set of sequences and for a given model, one of various options; the embeddings, logits, explanatory (similar) sequences, attentions masks or umap coordinates. 
   - `predict_transforna_all_models`: Same as `predict_transforna` but computes the desired option for all the models as well as aggregates the output of the ensemble model.
   Both return a pandas dataframe containing the sequence along with the desired computation. 
+
+  Check the script at `src/tests/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
 ## Inference
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.

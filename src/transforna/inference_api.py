@@ -99,8 +99,29 @@ def prepare_inference_config(trained_on:str,model:str,mc_or_sc,logits_flag:bool)
 def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sc',\
                     logits_flag:bool = False,attention_flag:bool = False,\
                         similarity_flag:bool=False,n_sim:int=3,embedds_flag:bool = False, \
-                            umap_flag:bool = False,trained_on:str='full') -> Tuple:
-    
+                            umap_flag:bool = False,trained_on:str='full') -> pd.DataFrame:
+    '''
+    This function predicts the major class or sub class of a list of sequences using the TransfoRNA model.
+    Additionaly, it can return logits, attention scores, similarity scores, gene embeddings or umap embeddings.
+
+    Input:
+        sequences: list of sequences to predict
+        model: model to use for prediction
+        mc_or_sc: models trained on major class or sub class
+        logits_flag: whether to return logits
+        attention_flag: whether to return attention scores (obtained from the self-attention layer)
+        similarity_flag: whether to return explanatory/similar sequences in the training set
+        n_sim: number of similar sequences to return
+        embedds_flag: whether to return embeddings of the sequences
+        umap_flag: whether to return umap embeddings
+        trained_on: whether to use the model trained on the full dataset or the ID dataset
+    Output:
+        pd.DataFrame with the predictions
+    '''
+    #assers that only one flag is True
+    assert sum([logits_flag,attention_flag,similarity_flag,embedds_flag,umap_flag]) <= 1, 'One option at most can be True'
+    # capitalize the first letter of the model and the first letter after the -
+    model = "-".join([word.capitalize() for word in model.split("-")])
     root_dir,cfg = prepare_inference_config(trained_on,model,mc_or_sc,logits_flag)
 
     with redirect_stdout(None):
@@ -190,7 +211,24 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
 
 def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logits_flag: bool = False, attention_flag: bool = False,\
         similarity_flag: bool = False, n_sim:int = 3,
-        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full"):
+        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full") -> pd.DataFrame:
+    """
+    Predicts the labels of the sequences using all the models available in the transforna package.
+    If non of the flags are true, it constructs and aggrgates the output of the ensemble model.
+    
+    Input:
+        sequences: list of sequences to predict
+        mc_or_sc: models trained on major class or sub class
+        logits_flag: whether to return logits
+        attention_flag: whether to return attention scores (obtained from the self-attention layer)
+        similarity_flag: whether to return explanatory/similar sequences in the training set
+        n_sim: number of similar sequences to return
+        embedds_flag: whether to return embeddings of the sequences
+        umap_flag: whether to return umap embeddings
+        trained_on: whether to use the model trained on the full dataset or the ID dataset
+    Output:
+        df: dataframe with the predictions
+    """
     #print time
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
