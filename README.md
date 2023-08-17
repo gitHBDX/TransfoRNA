@@ -86,8 +86,17 @@ After inference, an `inference_output` in the `src` folder will be created which
  - The `inference_results_(model_name).csv` that includes the label of each sequence in the inference set and the models' confidence as to whether the sequence is novel (belongs to a class , the model was not trained on) or familiar. 
  - The embedds of each sequence obtained form the model if `log_embedds` in the `main_config` is `True`. 
 
-## Train
-TransfoRNA requires the input data to be in the form of an Anndata, `ad`, where `ad.var` contains all the sequences. The path of the anndata should be appended to the `dataset_path_train` key in `configs/train_model_configs/tcga`.
+## Train on custom data
+TransfoRNA requires the input data to be in the form of an Anndata, `ad`, where `ad.var` contains all the sequences. Some changes has to be made (follow `configs/train_model_configs/tcga`):
+In `configs/train_model_configs/custom`:
+- `dataset_path_train` has to point to the anndata. The anndata has to contain .var dataframe which is sequence indexed. The .var columns should contain `small_RNA_class_annotation`: indicating the major class if available (otherwise should be NaN), `five_prime_adapter_filter`: whether the sequence is considered a real sequence or an artifact (`True `for Real and `False` for artifact), `subclass_name` containing the sub-class name if available (otherwise should be NaN), and a boolean column `hico` indicating whether a sequence is high confidence or non.
+- If sampling from the precursor is required in order to augment the sub-classes, the `precursor_file_path` should include precursors. Follow the scheme of the HBDxBase.csv and have a look at `get_precursor_info` in `src/transforna/utils/utils.py`
+- `mapping_dict_path` should contain the mapping from sub class to major class. i.e: 'miR-141-5p' to 'miRNA'.
+- `clf_target` sets the classification target of the mopdel and should either `sub_class_hico` for training on targets in `subclass_name` or `major_class_hico` for training on targets in `small_RNA_class_annotation`.
+
+In configs/main_config, some changes should be made:
+- change `task` to custom.
+- set the `model_name` as desired.
 
 For training TransfoRNA from the root directory: 
 ```
