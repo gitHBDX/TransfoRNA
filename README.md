@@ -96,7 +96,7 @@ In `configs/train_model_configs/custom`:
 - `clf_target` sets the classification target of the mopdel and should either `sub_class_hico` for training on targets in `subclass_name` or `major_class_hico` for training on targets in `small_RNA_class_annotation`.
 
 In configs/main_config, some changes should be made:
-- change `task` to custom.
+- change `task` to `custom`.
 - set the `model_name` as desired.
 
 For training TransfoRNA from the root directory: 
