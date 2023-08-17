@@ -33,17 +33,15 @@ There are 5 models currently available, each with different input encoders.
  - Seq-Rev (best performant):
     - Input: (dual inputs) Sequence
     - Model: A transformer encoder for the sequence and another for the sequence reversed.
-    
-<img width="558" alt="Screenshot 2023-08-17 at 12 57 34" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/8dcb8499-0b46-40f6-83a8-0d2af71b3654">
 
+<img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
 
-    
 ## Repo Structure
 - configs: Contains the configurations of each model, training and inference settings.
  
   The `configs/main_config.yaml` file offers options to change the task, the training settings and the logging. The following shows all the options and permitted values for each option.
 
-   <img width="500" alt="Screenshot 2022-12-16 at 15 56 41" src="https://user-images.githubusercontent.com/82571392/208125570-30b5719c-cb6d-4e39-bbb6-02611336cd6a.png">
+   <img width="558" alt="Screenshot 2023-08-17 at 12 57 34" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/8dcb8499-0b46-40f6-83a8-0d2af71b3654">
 
 - [tcga scripts](https://github.com/gitHBDX/TransfoRNA/blob/master/tcga_scripts/readme.md) are scripts that offer various detailed analyses on TCGA.
 
