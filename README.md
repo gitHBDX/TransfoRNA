@@ -41,7 +41,7 @@ There are 5 models currently available, each with different input encoders.
  
   The `configs/main_config.yaml` file offers options to change the task, the training settings and the logging. The following shows all the options and permitted values for each option.
 
-   <img width="558" alt="Screenshot 2023-08-17 at 12 57 34" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/8dcb8499-0b46-40f6-83a8-0d2af71b3654">
+   <img width="566" alt="Screenshot 2023-08-17 at 13 43 15" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/bd1cdac5-f1d3-45fb-8543-5c2292a2542f">
 
 - [tcga scripts](https://github.com/gitHBDX/TransfoRNA/blob/master/tcga_scripts/readme.md) are scripts that offer various detailed analyses on TCGA.
 
@@ -88,6 +88,7 @@ After inference, an `inference_output` in the `src` folder will be created which
 
 ## Train on custom data
 TransfoRNA requires the input data to be in the form of an Anndata, `ad`, where `ad.var` contains all the sequences. Some changes has to be made (follow `configs/train_model_configs/tcga`):
+
 In `configs/train_model_configs/custom`:
 - `dataset_path_train` has to point to the anndata. The anndata has to contain .var dataframe which is sequence indexed. The .var columns should contain `small_RNA_class_annotation`: indicating the major class if available (otherwise should be NaN), `five_prime_adapter_filter`: whether the sequence is considered a real sequence or an artifact (`True `for Real and `False` for artifact), `subclass_name` containing the sub-class name if available (otherwise should be NaN), and a boolean column `hico` indicating whether a sequence is high confidence or non.
 - If sampling from the precursor is required in order to augment the sub-classes, the `precursor_file_path` should include precursors. Follow the scheme of the HBDxBase.csv and have a look at `get_precursor_info` in `src/transforna/utils/utils.py`
