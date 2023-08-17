@@ -5,6 +5,7 @@ for **small RNAs and RNA fragments**. These are typically found in RNA-seq NGS (
 
 TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenestein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it deceids if the query sequene is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based Bioinformatics tools, including the mapping to databases and the human genome. 
 
+
  
 ## Dataset (Objective):
 - **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs performance (classification of 278 sub-classes belonging to 11 major classes).
@@ -33,7 +34,7 @@ There are 5 models currently available, each with different input encoders.
     - Input: (dual inputs) Sequence
     - Model: A transformer encoder for the sequence and another for the sequence reversed.
     
-<img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
+<img width="558" alt="Screenshot 2023-08-17 at 12 57 34" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/8dcb8499-0b46-40f6-83a8-0d2af71b3654">
 
 
     
