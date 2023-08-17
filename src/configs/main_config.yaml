@@ -2,7 +2,7 @@ defaults:
   - model: transforna
   - inference_settings: default
   
-task: tcga # tcga,sncrna or premirna
+task: tcga # tcga,sncrna or premirna or custom (for a custom dataset)
 
 #train settings
 model_name: seq #seq, seq-seq, seq-struct, seq-reverse, seq-exp or baseline

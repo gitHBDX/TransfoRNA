@@ -36,7 +36,7 @@ class GeneEmbeddModelConfig:
         "overlap"  # either overlap or no_overlap or overlap_multi_window
     )
 
-    clf_target:str = 'sub_class_hico' # sub_class, major_class, sub_class_hico or major_class_hico. hico = high confidence
+    clf_target:str = 'm' # sub_class_hico or major_class_hico. hico = high confidence
     num_classes: int = 0 #will be infered during runtime
     class_mappings:List = field(default_factory=lambda: [])#will be infered during runtime
     class_weights :List = field(default_factory=lambda: [])
@@ -49,9 +49,9 @@ class GeneEmbeddModelConfig:
 
 @dataclass
 class GeneEmbeddTrainConfig:
-    dataset_path_train: str = '/data/TCGA__ngs__miRNA_log2RPM-23.4.0.h5ad'
-    precursor_file_path: str = '/data/HBDxBase.csv'
-    mapping_dict_path: str = '/data/subclass_to_annotation.json'
+    dataset_path_train: str = 'path/to/anndata.h5ad'
+    precursor_file_path: str = 'path/to/precursor_file.csv' #if not provided, sampling from the precurosr will not be done
+    mapping_dict_path: str = 'path/to/mapping_dict.json' #required for mapping sub class to major class, i.e: mir-568-3p to miRNA
     device: str = "cuda"
     l2_weight_decay: float = 0.05
     batch_size: int = 512

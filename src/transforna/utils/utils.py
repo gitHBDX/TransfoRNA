@@ -793,10 +793,10 @@ def prepare_data_tcga(dataset_class, configs):
     save(data = dataset_class.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
     return all_data
 
-def load_HBDxBase(cfg:dict):
-    HBDxBase_df = pd.read_csv(str(Path(__file__).parents[3])+cfg['train_config'].HBDxBase_file_path, index_col=0)
-    HBDxBase_df.loc[:,'precursor_bins'] = (HBDxBase_df.precursor_length/25).astype(int)
-    return HBDxBase_df
+def load_precursor_file(cfg:dict):
+    precursor_df = pd.read_csv(str(Path(__file__).parents[3])+cfg['train_config'].precursor_file_path, index_col=0)
+    precursor_df.loc[:,'precursor_bins'] = (precursor_df.precursor_length/25).astype(int)
+    return precursor_df
 
 def introduce_mismatches(seq, n_mismatches):
     seq = list(seq)
@@ -863,9 +863,9 @@ def get_bin_with_max_overlap(precursor_len:int,start_frag_pos:int,frag_len:int,n
             start_frag_pos -= bin_len
     return bin_no+1
 
-def get_precursor_info(HBDxBase_df:pd.DataFrame,mc:str,sc:str):
+def get_precursor_info(precursor_df:pd.DataFrame,mc:str,sc:str):
 
-    xRNA_df = HBDxBase_df.loc[HBDxBase_df.sRNA_class == mc]
+    xRNA_df = precursor_df.loc[precursor_df.sRNA_class == mc]
     xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
     prec_name = sc.split('_bin-')[0]
     bin_no = int(sc.split('_bin-')[1])
@@ -875,7 +875,7 @@ def get_precursor_info(HBDxBase_df:pd.DataFrame,mc:str,sc:str):
         prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
         #check if prec_row_df is empty
         if prec_row_df.empty:
-            xRNA_df = HBDxBase_df.loc[HBDxBase_df.sRNA_class == 'pseudo_'+mc]
+            xRNA_df = precursor_df.loc[precursor_df.sRNA_class == 'pseudo_'+mc]
             xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
             prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
             if prec_row_df.empty:
@@ -1017,7 +1017,7 @@ def augment_fusion(ad,fusion_label:str='fusion'):
     return fusion_df
 
     
-def populate_scs_with_bins(ad:AnnData,other_sc_df:pd.DataFrame,mapping_dict:Dict,min_num_samples_per_sc:int=1,trained_on:str='id'):
+def populate_scs_with_bins(ad:AnnData,precursor_df:pd.DataFrame,mapping_dict:Dict,min_num_samples_per_sc:int=1,trained_on:str='id'):
     augmented_df = pd.DataFrame()
     #append samples per sc for bin continuity
     unique_labels = ad.var.Labels.value_counts()[ad.var.Labels.value_counts() >= min_num_samples_per_sc].index.tolist()
@@ -1040,7 +1040,7 @@ def populate_scs_with_bins(ad:AnnData,other_sc_df:pd.DataFrame,mapping_dict:Dict
             scs_list.append(sc)
             scs_before.append(len(existing_seqs))
             #augment fragments from prev or consecutive bin
-            precursor,prec_name = get_precursor_info(other_sc_df,mc,sc)
+            precursor,prec_name = get_precursor_info(precursor_df,mc,sc)
             sc2_df = populate_from_bin(sc,mc,precursor,prec_name,existing_seqs)
             augmented_df = augmented_df.append(sc2_df)
             sc_after.append(len(sc2_df))
@@ -1120,15 +1120,21 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
         mc_or_sc = 'mc'
 
     
+    try:
+        precursor_df = load_precursor_file(config)
+    except:
+        print('Base file containing precursors could not be loaded')
 
-    other_sc_df = load_HBDxBase(config)
-    #mapping_dict = load('data/subclass_to_annotation.json')
     mapping_dict = load(str(Path(__file__).parents[3])+config['train_config'].mapping_dict_path)
 
     if config.trained_on == 'id':
         #8 is the minimum number of samples per sc so that train_df gets 6, valid 1 and test 1. refer to split_tcga_data
-        #augmented_df = populate_scs_with_bins(ad,other_sc_df,mapping_dict,min_num_samples_per_sc=8,trained_on=config.trained_on)
-        #ad = combine_var(ad,augmented_df)
+        try:
+            augmented_df = populate_scs_with_bins(ad,precursor_df,mapping_dict,min_num_samples_per_sc=8,trained_on=config.trained_on)
+            ad = combine_var(ad,augmented_df)
+        except:
+            print('Could not sample from precursors')
+        
         if mc_or_sc == 'mc':
             #convert ad.var.Labels to major class using mapping_dict and then to category
             ad.var['Labels'] = ad.var['Labels'].map(mapping_dict).astype('category')
@@ -1138,7 +1144,12 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
         model_name = config.model_name
         model_names = {'baseline':'Baseline','seq':'Seq','seq-seq':'Seq-Seq','seq-struct':'Seq-Struct','seq-rev':'Seq-Rev'}
         model_name = model_names[model_name]
-        df = predict_transforna_na(model=model_name)
+        try:
+            df = predict_transforna_na(model=model_name)
+        except:
+            df = pd.DataFrame(columns=['Sequence','Labels','Is Familiar?'])
+            print('Could not load predictions from TransForNA, check if ID models exist in the desired structure')
+
         set1 = set(ad.var.Labels.cat.categories)
         set2 = set(df.Labels.unique())
         ad.var['Labels'] = ad.var['Labels'].cat.add_categories(set2.difference(set1))
@@ -1154,7 +1165,12 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
         random_df = pd.DataFrame(index=random_seqs, data=['random']*len(random_seqs)\
         , columns =['Labels'])
 
-        augmented_df = populate_scs_with_bins(ad,other_sc_df,mapping_dict,trained_on=config.trained_on)
+        try:
+            augmented_df = populate_scs_with_bins(ad,precursor_df,mapping_dict,trained_on=config.trained_on)
+        except:
+            augmented_df = pd.DataFrame(columns=['Labels'])
+            print('Could not sample from precursors')
+
         #augment fusion class:
         fusion_df = augment_fusion(ad,fusion_label='fusion')
 
@@ -1168,9 +1184,7 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
             ad.var['Labels'] = ad.var['Labels'].map(mapping_dict).astype('category')
 
 
-    #AA
-    #load older tcga version includes hbdx_spikein_affix_filter + five_prime_adapter_filter
-    #older_ad = load('data/TCGA__ngs__miRNA_log2RPM-23.3.0.h5ad')
+    #AA seqs are sequences that have 5' adapter
     aa_seqs = ad.var[ad.var['five_prime_adapter_filter'] == 0].index.tolist()
     ad.var['Labels'] = ad.var['Labels'].cat.add_categories('artificial_affix')
     ad.var.loc[aa_seqs,'Labels'] = 'artificial_affix'
