@@ -61,7 +61,11 @@ There are 5 models currently available, each with different input encoders.
  ```
  
  This will create and activate a new conda environment with the name: `transforna`
- 
+ ## TransfoRNA API
+ In `src/transforna/inference_api.py`, all the functionalities of transforna are offered as APIs. There are two functions of interest:
+  - `predict_transforna` : Computes for a set of sequences and for a given model, one of various options; the embeddings, logits, explanatory (similar) sequences, attentions masks or umap coordinates. 
+  - `predict_transforna_all_models`: Same as `predict_transforna` but computes the desired option for all the models as well as aggregates the output of the ensemble model.
+  Both return a pandas dataframe containing the sequence along with the desired computation. 
 ## Inference
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
@@ -77,6 +81,10 @@ Then, navigate the repositories' root directory and run the following command:
 python src/main.py inference=True
 ```
 
+After inference, an `inference_output` in the `src` folder will be created which will then include two files. 
+ - The `inference_results_(model_name).csv` that includes the label of each sequence in the inference set and the models' confidence as to whether the sequence is novel (belongs to a class , the model was not trained on) or familiar. 
+ - The embedds of each sequence obtained form the model if `log_embedds` in the `main_config` is `True`. 
+
 ## Train
 TransfoRNA requires the input data to be in the form of an Anndata, `ad`, where `ad.var` contains all the sequences. The path of the anndata should be appended to the `dataset_path_train` key in `configs/train_model_configs/tcga`.
 
@@ -84,7 +92,7 @@ For training TransfoRNA from the root directory:
 ```
 python src/main.py
 ```
-Using [Hydra](https://hydra.cc/), any option in the main config can be changed. For instance, to train a Seq-Struct TransfoRNA model without using a validation split:
+Using [Hydra](https://hydra.cc/), any option in the main config can be changed. For instance, to train a `Seq-Struct` TransfoRNA model without using a validation split:
 ```
 python src/main.py train_split=False model_name='seq-struct'
 ```
