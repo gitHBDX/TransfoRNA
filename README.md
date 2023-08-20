@@ -1,9 +1,9 @@
 # TransfoRNA
-TransfoRNA is a **Bioinformatics** and **machine learning** tool based on **Transformers** to provide annotations for 11 major classes (miRNA, rRNA, tRNA, snoRNA, protein 
--coding/mRNA, lncRNA, and YRNA, piRNA,snRNA,snoRNA and vtRNA) and 1225 sub-classes 
-for **small RNAs and RNA fragments**. These are typically found in RNA-seq NGS (next generation sequencing) data.
+TransfoRNA is a **bioinformatics** and **machine learning** tool based on **Transformers** to provide annotations for 11 major classes (miRNA, rRNA, tRNA, snoRNA, protein 
+-coding/mRNA, lncRNA, YRNA, piRNA, snRNA, snoRNA and vtRNA) and 1225 sub-classes 
+for **human small RNAs and RNA fragments**. These are typically detected by RNA-seq NGS (next generation sequencing) data.
 
-TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenestein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it deceids if the query sequene is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based Bioinformatics tools, including the mapping to databases and the human genome. 
+TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. 
 
 
  
@@ -15,6 +15,7 @@ TransfoRNA can be trained on just the RNA sequences and optionally on additional
   - HICO RNAs are further divided into **in-distribution, ID** (278 sub-classes) and **out-of-distribution, OOD** (947 sub-classes) sets.
     - Criteria for ID and OOD:  Sub-class containing more than 10 sequences are considered ID, otherwise OOD.
   - An additional **artificial affix set, AA** contains ~250 sequences known to be technical artefacts.
+  - The knowledge-based annotation (KBA) pipline including installation guide is located under `kba_pipline`
     
 ## Models
 There are 5 models currently available, each with different input encoders.

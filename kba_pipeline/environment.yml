@@ -1,0 +1,19 @@
+name: hbdx_kba
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - anndata=0.8.0
+  - bedtools=2.30.0
+  - biopython=1.79
+  - bowtie=1.3.1
+  - joblib>=1.2.0
+  - pyfastx=0.8.4
+  - pytest
+  - python=3.10.6
+  - pyyaml
+  - rich
+  - samtools=1.16.1
+  - tqdm
+  - viennarna=2.5.1
+  - pip
