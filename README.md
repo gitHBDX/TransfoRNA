@@ -11,9 +11,9 @@ TransfoRNA can be trained on just the RNA sequences and optionally on additional
 - **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs performance (classification of 278 sub-classes belonging to 11 major classes).
   - Sequences are annotated based on a knowledge-based annotation approach that provides annotations for 1k+ different sub-classes.
   - Knowledge-based annotations are divided into three sets of varying confidence levels: a **high-confidence (HICO)** set, a **low-confidence (LOCO)** set, and a **non-annotated (NA)** set for sequences that could not be annotated at all. Only HICO annotations are used for training.
-  - HICO RNAs cover 1225 sub-classes and constitute ~9% of all RNAs found in TCGA. LOCO and NA sets comprise 60% and 31% of RNAs, respectively.
+  - HICO RNAs cover 1225 sub-classes and constitute ~15.1% of all RNAs found in TCGA. LOCO and NA sets comprise 71.4% and 13.6% of RNAs, respectively.
   - HICO RNAs are further divided into **in-distribution, ID** (278 sub-classes) and **out-of-distribution, OOD** (947 sub-classes) sets.
-    - Criteria for ID and OOD:  Sub-class containing more than 10 sequences are considered ID, otherwise OOD.
+    - Criteria for ID and OOD:  Sub-class containing more than 8 sequences are considered ID, otherwise OOD.
   - An additional **artificial affix set, AA** contains ~250 sequences known to be technical artefacts.
   - The knowledge-based annotation (KBA) pipline including installation guide is located under `kba_pipline`
     
