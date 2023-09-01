@@ -14,7 +14,7 @@ TransfoRNA can be trained on just the RNA sequences and optionally on additional
   - HICO RNAs cover 1225 sub-classes and constitute ~15.1% of all RNAs found in TCGA. LOCO and NA sets comprise 71.4% and 13.6% of RNAs, respectively.
   - HICO RNAs are further divided into **in-distribution, ID** (278 sub-classes) and **out-of-distribution, OOD** (947 sub-classes) sets.
     - Criteria for ID and OOD:  Sub-class containing more than 8 sequences are considered ID, otherwise OOD.
-  - An additional **artificial affix set, AA** contains ~250 sequences known to be technical artefacts.
+  - An additional **putative 5' adapter affixes set** contains ~250 sequences known to be technical artefacts. The 5’-end perfectly matches the last five or more nucleotides of the 5’-adapter sequence, commonly used in small RNA sequencing.
   - The knowledge-based annotation (KBA) pipline including installation guide is located under `kba_pipline`
     
 ## Models
