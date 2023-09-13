@@ -37,6 +37,19 @@ There are 5 models currently available, each with different input encoders.
 
 <img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
 
+## Data Availability
+Downloading the data and the models can be done from [here](https://www.dropbox.com/sh/y7u8cofmg41qs0y/AADvj5lw91bx7fcDxghMbMtsa?dl=0). 
+
+This will download three subfolders that should be kept on the same folder level as `src`:
+  - `data`:  Contains three files:
+    - `TCGA` anndata with ~75k sequences and `var` columns containing the knowledge based annotations. 
+    - `HBDXBase.csv` containing a list of RNA precursors which are then used for data augmentation. 
+    - `subclass_to_annotation.json` holds mappings for every sub-class to major-class.
+
+  - `models`: 
+    - `benchmark` : contains benchmark models trained on sncRNA and premiRNA data. (See additional datasets at the bottom)
+    - `tcga`: All models trained on the TCGA data; either for testing and validation `TransfoRNA_ID` or the production version `TransfoRNA_FULL` which contains  higher RNA major and sub-class coverage. Models trained on major-class and sub-class exist seperately in their respective folders.
+  - `kba_pipeline`: contains data to run the knowledge based pipeline manually.
 ## Repo Structure
 - configs: Contains the configurations of each model, training and inference settings.
  
@@ -67,7 +80,7 @@ There are 5 models currently available, each with different input encoders.
   - `predict_transforna_all_models`: Same as `predict_transforna` but computes the desired option for all the models as well as aggregates the output of the ensemble model.
   Both return a pandas dataframe containing the sequence along with the desired computation. 
 
-  Check the script at `src/tests/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
+  Check the script at `src/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
 ## Inference
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
