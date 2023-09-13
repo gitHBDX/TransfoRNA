@@ -49,7 +49,7 @@ This will download three subfolders that should be kept on the same folder level
   - `models`: 
     - `benchmark` : contains benchmark models trained on sncRNA and premiRNA data. (See additional datasets at the bottom)
     - `tcga`: All models trained on the TCGA data; either for testing and validation `TransfoRNA_ID` or the production version `TransfoRNA_FULL` which contains  higher RNA major and sub-class coverage. Models trained on major-class and sub-class exist seperately in their respective folders.
-  - `kba_pipeline`: contains data to run the knowledge based pipeline manually.
+  - `kba_pipeline`: contains mapping reference data required to run the knowledge based pipeline manually
 ## Repo Structure
 - configs: Contains the configurations of each model, training and inference settings.
  
