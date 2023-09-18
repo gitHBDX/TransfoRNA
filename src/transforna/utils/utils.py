@@ -1147,13 +1147,13 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
         try:
             df = predict_transforna_na(model=model_name)
         except:
-            df = pd.DataFrame(columns=['Sequence','Labels','Is Familiar?'])
+            df = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
             print('Could not load predictions from TransForNA, check if ID models exist in the desired structure')
 
         set1 = set(ad.var.Labels.cat.categories)
         set2 = set(df.Labels.unique())
         ad.var['Labels'] = ad.var['Labels'].cat.add_categories(set2.difference(set1))
-        ad.var.loc[df[df['Is Familiar?'] == True].Sequence.values,'Labels'] = df[df['Is Familiar?'] == True].Labels.values
+        ad.var.loc[df[df['Is Familiar?'] == True].Sequence.values,'Labels'] = df[df['Is Familiar?'] == True]['Net-Label'].values
 
         #create random sequences from bases: A,C,G,T with length 18-30
         random_seqs = []
@@ -1233,11 +1233,9 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
     index = pd.MultiIndex.from_product(iterables, names=["type of data", "indices"])
     logits_df = pd.DataFrame(columns=index, data=np.array(logits))
 
-    #add Labels,entropy to df
-    all_data["infere_rna_seq"]["Labels",'0'] = predicted_labels
-    all_data["infere_rna_seq"]["Entropy",'0'] = entropy(logits,axis=1)
+    #add Labels,novelty to df
+    all_data["infere_rna_seq"]["Net-Label",'0'] = predicted_labels
     all_data["infere_rna_seq"]["is_familiar",'0'] = entropy(logits,axis=1) <= threshold
-    all_data["infere_rna_seq"]["threshold",'0'] = threshold
 
     all_data["infere_rna_seq"].set_index("Sequences",inplace=True)
 
@@ -1247,7 +1245,7 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
         all_data["infere_rna_seq"] = all_data["infere_rna_seq"].join(seq_logits_df)
         all_data["infere_rna_seq"].index.name = f'Sequences, Max Length={max_len}'
     else:
-        all_data["infere_rna_seq"].columns = ['Labels','Entropy','Is Familiar?','Threshold']
+        all_data["infere_rna_seq"].columns = ['Net-Label','Is Familiar?']
         all_data["infere_rna_seq"].index.name = f'Sequences, Max Length={max_len}'
 
 

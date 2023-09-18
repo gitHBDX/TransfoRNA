@@ -27,24 +27,24 @@ warnings.filterwarnings("ignore")
 
 def aggregate_ensemble_model(lev_dist_df:pd.DataFrame):
     '''
-    This function aggregates the predictions of the ensemble model by choosing the model with the lowest and the highest LV Distance per query sequence.
-    If the lowest LV Distance is lower than LV Thresh., then the model with the lowest LV Distance is chosen as the ensemble prediction.
-    Otherwise, the model with the highest LV Distance is chosen as the ensemble prediction.
+    This function aggregates the predictions of the ensemble model by choosing the model with the lowest and the highest NLD per query sequence.
+    If the lowest NLD is lower than Novelty Threshold, then the model with the lowest NLD is chosen as the ensemble prediction.
+    Otherwise, the model with the highest NLD is chosen as the ensemble prediction.
     '''
-    #for every sequence, if at least one model scores an LV Distance < LV Thresh., then get the one with the least LV Distance as the ensemble prediction
-    #otherwise, get the highest LV Distance.
-    #get the minimum LV Distance per query sequence
+    #for every sequence, if at least one model scores an NLD < Novelty Threshold, then get the one with the least NLD as the ensemble prediction
+    #otherwise, get the highest NLD.
+    #get the minimum NLD per query sequence
     #remove the baseline model
     baseline_df = lev_dist_df[lev_dist_df['Model'] == 'Baseline'].reset_index(drop=True)
     lev_dist_df = lev_dist_df[lev_dist_df['Model'] != 'Baseline'].reset_index(drop=True)
-    min_lev_dist_df = lev_dist_df.iloc[lev_dist_df.groupby('Sequence')['LV Distance'].idxmin().values]
-    #get the maximum LV Distance per query sequence
-    max_lev_dist_df = lev_dist_df.iloc[lev_dist_df.groupby('Sequence')['LV Distance'].idxmax().values]
-    #choose between each row in min_lev_dist_df and max_lev_dist_df based on the value of LV Thresh.
-    novel_mask_df = min_lev_dist_df['LV Distance'] > min_lev_dist_df['LV Thresh.']
-    #get the rows where LV Distance is lower than LV Thresh.
+    min_lev_dist_df = lev_dist_df.iloc[lev_dist_df.groupby('Sequence')['NLD'].idxmin().values]
+    #get the maximum NLD per query sequence
+    max_lev_dist_df = lev_dist_df.iloc[lev_dist_df.groupby('Sequence')['NLD'].idxmax().values]
+    #choose between each row in min_lev_dist_df and max_lev_dist_df based on the value of Novelty Threshold
+    novel_mask_df = min_lev_dist_df['NLD'] > min_lev_dist_df['Novelty Threshold']
+    #get the rows where NLD is lower than Novelty Threshold
     min_lev_dist_df = min_lev_dist_df[~novel_mask_df.values]
-    #get the rows where LV Distance is higher than LV Thresh.
+    #get the rows where NLD is higher than Novelty Threshold
     max_lev_dist_df = max_lev_dist_df[novel_mask_df.values]
     #merge min_lev_dist_df and max_lev_dist_df
     ensemble_lev_dist_df = pd.concat([min_lev_dist_df,max_lev_dist_df])
@@ -174,14 +174,14 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             sequences = gene_embedds_df.index.tolist()
             #duplicate each sequence n_sim times
             sequences_duplicated = [seq for seq in sequences for _ in range(n_sim)]
-            sim_df['Query Sequence'] = sequences_duplicated
+            sim_df['Sequence'] = sequences_duplicated
             #assign top_5_seqs list to df column
-            sim_df[f'Top {n_sim} Similar Sequences'] = top_n_seqs
-            sim_df['LV Distance'] = lev_dist
+            sim_df[f'Explanatory Sequence'] = top_n_seqs
+            sim_df['NLD'] = lev_dist
             sim_df['Labels'] = top_n_labels
-            sim_df['LV Thresh.'] = lv_threshold
-            #for every query sequence, order the LV Distance in a increasing order
-            sim_df = sim_df.sort_values(by=['Query Sequence','LV Distance'],ascending=[False,True])
+            sim_df['Novelty Threshold'] = lv_threshold
+            #for every query sequence, order the NLD in a increasing order
+            sim_df = sim_df.sort_values(by=['Sequence','NLD'],ascending=[False,True])
             return sim_df
         
         print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
@@ -196,16 +196,15 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             umap = UMAP(n_components=2,random_state=42)
             scaled_embedds = StandardScaler().fit_transform(gene_embedds_df.values)
             gene_embedds_df = pd.DataFrame(umap.fit_transform(scaled_embedds),columns=['UMAP1','UMAP2'])
-            gene_embedds_df['Labels'] = infer_pd['Labels'].values
+            gene_embedds_df['Net-Label'] = infer_pd['Net-Label'].values
             gene_embedds_df['Is Familiar?'] = infer_pd['Is Familiar?'].values
             gene_embedds_df['Sequence'] = infer_pd.index
             return gene_embedds_df
 
         #override threshold
-        infer_pd['LV Thresh.'] = lv_threshold
-        infer_pd['LV Distance'] = lv_dist_closest
-        infer_pd['Ent Thresh.'] = ent_threshold
-        infer_pd = infer_pd.round({"LV Distance": 2, "LV Thresh.": 2})
+        infer_pd['Novelty Threshold'] = lv_threshold
+        infer_pd['NLD'] = lv_dist_closest
+        infer_pd = infer_pd.round({"NLD": 2, "Novelty Threshold": 2})
         print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
 
