@@ -68,8 +68,13 @@ This will download three subfolders that should be kept on the same folder level
  The `environment.yml` includes all the required packages for TransfoRNA installation. Edit the `prefix` key to point to the conda folder, then run:
  
  ```
+ #update
+ conda update -n base -c conda-forge conda
+
+ #create env
  conda env create -f environment.yml
- 
+
+ #activate
  conda activate transforna
  ```
  
