@@ -167,7 +167,7 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
 
 if __name__ == "__main__":
     #######################################TO CONFIGURE#############################################
-    path = f'models/tcga/TransfoRNA_ID/sub_class/{sys.argv[1]}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
+    path = f'models/tcga/TransfoRNA_FULL/sub_class/{sys.argv[1]}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','na']
     #run name
     run_name = None #if None, then the name of the model inputs will be used as the name

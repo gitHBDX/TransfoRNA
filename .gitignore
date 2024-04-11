@@ -153,6 +153,7 @@ embedds/
 runs/
 outputs/
 models/
+models_old/
 data/
 scripts/ckpt*
 results/*

@@ -54,7 +54,7 @@ class Results_Handler():
             self.seperate_label_from_ood() #ID: ood will contain OOD. FULL: ood will contain random
 
         #path for a dict mapping from sub_class to major class
-        self.mapping_dict_path = str(Path(__file__).parents[3])+'/data/subclass_to_annotation.json'
+        self.mapping_dict_path = self.get_specific_hp_param(hp_param="mapping_dict_path")
         self.sc_to_mc_mapper_dict = self.load_mc_mapping_dict()
 
         #get whether curr results are trained on ID or FULL

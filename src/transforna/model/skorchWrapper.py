@@ -103,11 +103,7 @@ class Net(skorch.NeuralNet):
             "dataset_valid": dataset_valid,
         }
 
-        iterator_train = self.get_iterator(dataset_train, training=True)
-        iterator_valid = None
-        if dataset_valid is not None:
-            iterator_valid = self.get_iterator(dataset_valid, training=False)
-            
+
         self.set_save_epoch()
 
         for epoch_no in range(epochs):
@@ -121,7 +117,7 @@ class Net(skorch.NeuralNet):
             self.notify("on_epoch_begin", **on_epoch_kwargs)
 
             self.run_single_epoch(
-                iterator_train,
+                dataset_train,
                 training=True,
                 prefix="train",
                 step_fn=self.train_step,
@@ -130,7 +126,7 @@ class Net(skorch.NeuralNet):
 
             if dataset_valid is not None:
                 self.run_single_epoch(
-                    iterator_valid,
+                    dataset_valid,
                     training=False,
                     prefix="valid",
                     step_fn=self.validation_step,

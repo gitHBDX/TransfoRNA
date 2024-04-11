@@ -120,51 +120,56 @@ def get_closest_ngbr_per_split(results:Results_Handler,split:str,num_neighbors:i
     lev_dist = get_lev_dist(split_seqs,top_n_seqs)
     return split_seqs,split_labels,top_n_seqs,top_n_labels,distances,lev_dist
 
-def predict_transforna_na(model: str = "Seq-Rev") -> Tuple:
-    root_dir = Path(__file__).parents[3].absolute()
+def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sc',trained_on:str = 'id',path_to_models:str = 'models/tcga/') -> DictConfig:
+    inference_config = config.copy()
+    model = config['model_name']
+    model = "-".join([word.capitalize() for word in model.split("-")])
+    transforna_folder = "TransfoRNA_ID"
+    if trained_on == "full":
+        transforna_folder = "TransfoRNA_FULL"
+    if mc_or_sc == 'sc':
+        target = 'sub_class'
+    else:
+        target = 'major_class'
 
-    model_cfg = yaml.load((root_dir / "src/configs/model/transforna.yaml").read_text(), Loader=SafeLoader)
-
-    infer_cfg = yaml.load((root_dir / "src/configs/inference_settings/default.yaml").read_text(), Loader=SafeLoader)
-
-    infer_cfg["model_path"] = f'{root_dir}/models/tcga/TransfoRNA_ID/sub_class/{model}/ckpt/model_params_tcga.pt'
-
-    main_cfg = yaml.load((root_dir / "src/configs/main_config.yaml").read_text(), Loader=SafeLoader)
-    main_cfg["model"] = model_cfg
-    main_cfg["inference_settings"] = infer_cfg
-    main_cfg["model_name"] = model.lower()
-    main_cfg["inference"] = True
-
-    main_cfg["log_logits"] = False
+    inference_config['inference_settings']["model_path"] = f'{path_to_models}{transforna_folder}/{target}/{model}/ckpt/model_params_tcga.pt'
+    inference_config["inference"] = True
+    inference_config["log_logits"] = False
 
 
-    cfg = DictConfig(main_cfg)
-    train_cfg_path = get_hp_setting(cfg, "train_config")
-    model_cfg_path = get_hp_setting(cfg, "model_config")
+    inference_config = DictConfig(inference_config)
+    #train and model config should be fetched from teh inference model
+    train_cfg_path = get_hp_setting(inference_config, "train_config")
+    model_cfg_path = get_hp_setting(inference_config, "model_config")
     train_config = instantiate(train_cfg_path)
     model_config = instantiate(model_cfg_path)
     # prepare configs as structured dicts
     train_config = OmegaConf.structured(train_config)
     model_config = OmegaConf.structured(model_config)
     # update model config with the name of the model
-    model_config["model_input"] = cfg["model_name"]
-    cfg = OmegaConf.merge({"train_config": train_config, "model_config": model_config}, cfg)
+    model_config["model_input"] = inference_config["model_name"]
+    inference_config = OmegaConf.merge({"train_config": train_config, "model_config": model_config}, inference_config)
+    return inference_config
 
+def predict_transforna_na(config:DictConfig = None) -> Tuple:
+    inference_config = update_config_with_inference_params(config)
+    
     #path should be infer_cfg["model_path"] - 2 level + embedds
-    path = '/'.join(infer_cfg["model_path"].split('/')[:-2])+'/embedds'
+    path = '/'.join(inference_config['inference_settings']["model_path"].split('/')[:-2])+'/embedds'
     #read threshold
     results:Results_Handler = Results_Handler(path=path,splits=['train','na'])
     results.get_knn_model()
     threshold = load(results.analysis_path+"/novelty_model_coef")["Threshold"]
     sequences = results.splits_df_dict['na_df'][results.seq_col].values[:,0]
     with redirect_stdout(None):
-        cfg, net = get_model(cfg, root_dir)
+        root_dir = Path(__file__).parents[3].absolute()
+        inference_config, net = get_model(inference_config, root_dir)
         infer_pd = pd.Series(sequences, name="Sequences").to_frame()
         print(f'predicting sub classes for the NA set by the ID models')
-        predicted_labels, logits,gene_embedds_df, attn_scores_pd,all_data, max_len, net = infer_from_pd(cfg, net, infer_pd, DatasetTcga)
+        predicted_labels, logits,gene_embedds_df, attn_scores_pd,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, DatasetTcga)
 
 
-    prepare_inference_results_tcga(cfg, predicted_labels, logits, all_data, max_len)
+    prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
     infer_pd = all_data["infere_rna_seq"]
 
     
@@ -179,12 +184,7 @@ def predict_transforna_na(model: str = "Seq-Rev") -> Tuple:
     return infer_pd.rename_axis("Sequence").reset_index()
     
     
-# function to return key for any value
-def get_key(input_dict,val):
-    for key, value in input_dict.items():
-         if val == value:
-             return key
-    return "key doesn't exist"
+
 
 def set_seed_and_device(seed:int = 0,device_no:int=0):
     # set seed
@@ -794,7 +794,7 @@ def prepare_data_tcga(dataset_class, configs):
     return all_data
 
 def load_precursor_file(cfg:dict):
-    precursor_df = pd.read_csv(str(Path(__file__).parents[3])+cfg['train_config'].precursor_file_path, index_col=0)
+    precursor_df = pd.read_csv(cfg['train_config'].precursor_file_path, index_col=0)
     precursor_df.loc[:,'precursor_bins'] = (precursor_df.precursor_length/25).astype(int)
     return precursor_df
 
@@ -1125,7 +1125,7 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
     except:
         print('Base file containing precursors could not be loaded')
 
-    mapping_dict = load(str(Path(__file__).parents[3])+config['train_config'].mapping_dict_path)
+    mapping_dict = load(config['train_config'].mapping_dict_path)
 
     if config.trained_on == 'id':
         #8 is the minimum number of samples per sc so that train_df gets 6, valid 1 and test 1. refer to split_tcga_data
@@ -1141,17 +1141,14 @@ def append_model_input(ad:AnnData,config:Dict) -> AnnData:
 
 
     if config.trained_on == 'full':
-        model_name = config.model_name
-        model_names = {'baseline':'Baseline','seq':'Seq','seq-seq':'Seq-Seq','seq-struct':'Seq-Struct','seq-rev':'Seq-Rev'}
-        model_name = model_names[model_name]
         try:
-            df = predict_transforna_na(model=model_name)
+            df = predict_transforna_na(config)
         except:
             df = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
             print('Could not load predictions from TransForNA, check if ID models exist in the desired structure')
 
         set1 = set(ad.var.Labels.cat.categories)
-        set2 = set(df.Labels.unique())
+        set2 = set(df['Net-Label'].unique())
         ad.var['Labels'] = ad.var['Labels'].cat.add_categories(set2.difference(set1))
         ad.var.loc[df[df['Is Familiar?'] == True].Sequence.values,'Labels'] = df[df['Is Familiar?'] == True]['Net-Label'].values
 
@@ -1234,8 +1231,8 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
     logits_df = pd.DataFrame(columns=index, data=np.array(logits))
 
     #add Labels,novelty to df
-    all_data["infere_rna_seq"]["Net-Label",'0'] = predicted_labels
-    all_data["infere_rna_seq"]["is_familiar",'0'] = entropy(logits,axis=1) <= threshold
+    all_data["infere_rna_seq"]["Net-Label"] = predicted_labels
+    all_data["infere_rna_seq"]["Is Familiar?"] = entropy(logits,axis=1) <= threshold
 
     all_data["infere_rna_seq"].set_index("Sequences",inplace=True)
 
@@ -1243,10 +1240,8 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
     if cfg["log_logits"]:
         seq_logits_df = logits_df.join(rna_seqs_df).set_index(("Sequences",0))
         all_data["infere_rna_seq"] = all_data["infere_rna_seq"].join(seq_logits_df)
-        all_data["infere_rna_seq"].index.name = f'Sequences, Max Length={max_len}'
-    else:
-        all_data["infere_rna_seq"].columns = ['Net-Label','Is Familiar?']
-        all_data["infere_rna_seq"].index.name = f'Sequences, Max Length={max_len}'
+       
+    all_data["infere_rna_seq"].index.name = f'Sequences, Max Length={max_len}'
 
 
     return 
@@ -1258,8 +1253,14 @@ def get_tokenization_dicts(cfg):
     return seq_token_dict,ss_token_dict
 
 def get_hp_setting(cfg,setting):
-    model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
-    return load(model_parent_path+'/meta/hp_settings')[setting]
+    try:
+        model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
+        return load(model_parent_path+'/meta/hp_settings')[setting]
+    except: 
+        root_path = str(Path(__file__).parents[3])
+        cfg['inference_settings']['model_path'] = root_path+'/'+cfg['inference_settings']['model_path']
+        model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
+        return load(model_parent_path+'/meta/hp_settings')[setting]
 
 def add_ss_and_labels(infer_data):
     #check if infer_data has secondary structure
@@ -1300,8 +1301,7 @@ def prepare_inference_data(cfg,ad,dataset_class):
     return all_data
 
 def get_model(cfg,path):
-    root_path = str(Path(__file__).parents[3])
-    cfg['inference_settings']['model_path'] = root_path+'/'+cfg['inference_settings']['model_path']
+
     cfg["model_config"] = get_hp_setting(cfg,'model_config')
 
     #set seed and update skorch config
@@ -1347,7 +1347,7 @@ def infer_from_pd(cfg,net,infer_pd,DataClass,attention_flag:bool=False):
         
         
     #create dataclass to tokenize infer sequences
-    dataset_class = DataClass(infer_ad,cfg,inference=True)
+    dataset_class = DataClass(infer_ad,cfg)
     #update datasetclass with tokenization dicts and tokens_len
     dataset_class = update_dataclass_inference(cfg,dataset_class)
     #tokenize sequences

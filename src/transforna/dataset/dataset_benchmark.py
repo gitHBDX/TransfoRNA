@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
 from ..utils import energy
-from ..utils.utils import get_key
+
 pd.options.mode.chained_assignment = None
 
 class PrepareGeneData:
@@ -90,7 +90,14 @@ class PrepareGeneData:
         return (
             string[0 + i : window + i] for i in range(0, len(string) - window + 1, 1)
         )
+    # function to return key for any value
 
+    def get_key(self,input_dict,val):
+        for key, value in input_dict.items():
+            if val == value:
+                return key
+        return "key doesn't exist"
+    
     def tokenize_samples(self, window,sequences_to_be_tokenized,inference:bool=False) -> np.ndarray:
         """
         This function tokenizes rnas based on window(window)
@@ -138,7 +145,7 @@ class PrepareGeneData:
                         #if new token found during inference, then select random token (considered as noise)
                         warnings.warn(f"The sequence token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.seq_tokens_ids_dict.keys()) - 1)
-                        token = get_key(self.seq_tokens_ids_dict,id)
+                        token = self.get_key(self.seq_tokens_ids_dict,id)
                 # append id of token
                 sample_token_id.append(self.seq_tokens_ids_dict[token])
 
@@ -193,7 +200,7 @@ class PrepareGeneData:
                         #if new token found during inference, then select random token (considered as noise)
                         warnings.warn(f"The secondary structure token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.second_input_tokens_ids_dict.keys()) - 1)
-                        token = get_key(self.second_input_tokens_ids_dict,id)
+                        token = self.get_key(self.second_input_tokens_ids_dict,id)
                 # append id of token
                 sample_token_id.append(self.second_input_tokens_ids_dict[token])
             # append ids of tokenized sample

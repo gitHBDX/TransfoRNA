@@ -37,7 +37,7 @@ def train(cfg:Dict= None,path:str = None):
     #set seed
     set_seed_and_device(cfg["seed"],cfg["device_number"])
 
-    ad = load(str(Path(__file__).parents[3])+cfg["train_config"].dataset_path_train)
+    ad = load(cfg["train_config"].dataset_path_train)
 
     #instantiate dataset class
     
@@ -71,16 +71,8 @@ def train(cfg:Dict= None,path:str = None):
         infere_additional_test_data(net,all_data["additional_testset"])
 
     #log train and model HP to curr run dir    
-    model_config = {"model_config":OmegaConf.to_container(cfg["model_config"])}
-    train_config = {"train_config":OmegaConf.to_container(cfg["train_config"])}
-    #save main config
-    main_config = {}
-    for key in cfg.keys():
-        if key not in ['train_config','model_config','model','inference_settings']:
-            main_config[key] = cfg[key]
-    main_config = {"main_config":main_config}
-    
-    save(data=model_config|train_config|main_config,path=path+'/meta/hp_settings')
+    save(data=OmegaConf.to_container(cfg, resolve=True),path=path+'/meta/hp_settings')
+
     if cfg['tensorboard']:
         writer.close()
     return test_score,net

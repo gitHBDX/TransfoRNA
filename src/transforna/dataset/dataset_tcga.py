@@ -12,52 +12,10 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from ..utils import energy
 from ..utils.logger import log
 
-
-def get_key(input_dict,val):
-    for key, value in input_dict.items():
-         if val == value:
-             return key
-    return "key doesn't exist"
-
-class expShuffler(BaseEstimator, TransformerMixin):
-    """
-    shuffles expression of anndata. if shuffle is row_wise, then anndata
-    is shuffled along its rows. If shuffle is random, then the whole
-    anndata is shuffled (row and column)
-
-    Parameters
-    ----------
-    shuffle : str
-        Type of shuffle
-    """
-
-    def __init__(self, shuffle: str = "row_wise") -> None:
-        self.shuffle = shuffle
-
-    def fit(self, ad: AnnData, y=None):
-        return self
-
-    @log()
-    def transform(self, ad: AnnData, y=None) -> AnnData:
-        if self.shuffle == "random":
-            flattened_ad_X = ad.X.copy().ravel()
-            np.random.shuffle(flattened_ad_X)
-            ad.X = flattened_ad_X.reshape(ad.X.shape)
-
-        elif self.shuffle == "row_wise":
-            np.random.shuffle(ad.X)
-        return ad
-
 class PrepareGeneData:
-    def __init__(self, ad: AnnData, config: DictConfig,inference:bool=False):
-        if not inference:
-            #filter ad patients
-            #ad = self.get_balanced_ad(ad)
-            #shuffle data
-            self.shuffler  = expShuffler(shuffle="random")
-            self.ad = self.shuffler.fit_transform(ad)
-        else:
-            self.ad = ad
+    def __init__(self, ad: AnnData, config: DictConfig):
+
+        self.ad = ad
         
         #get input of model
         self.model_input = config["model_config"].model_input
@@ -156,6 +114,12 @@ class PrepareGeneData:
         return (
             string[0 + i : window + i] for i in range(0, len(string) - window + 1, 1)
         )
+    # function to return key for any value
+    def get_key(self,input_dict,val):
+        for key, value in input_dict.items():
+             if val == value:
+                 return key
+        return "key doesn't exist"
 
     def tokenize_samples(self, window,sequences_to_be_tokenized,inference:bool=False) -> np.ndarray:
         """
@@ -200,7 +164,7 @@ class PrepareGeneData:
                         #if new token found during inference, then select random token (considered as noise)
                         warnings.warn(f"The sequence token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.seq_tokens_ids_dict.keys()) - 1)
-                        token = get_key(self.seq_tokens_ids_dict,id)
+                        token = self.get_key(self.seq_tokens_ids_dict,id)
                 # append id of token
                 sample_token_id.append(self.seq_tokens_ids_dict[token])
 
@@ -251,7 +215,7 @@ class PrepareGeneData:
                         #if new token found during inference, then select random token (considered as noise)
                         warnings.warn(f"The secondary structure token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.second_input_tokens_ids_dict.keys()) - 1)
-                        token = get_key(self.second_input_tokens_ids_dict,id)
+                        token = self.get_key(self.second_input_tokens_ids_dict,id)
                 # append id of token
                 sample_token_id.append(self.second_input_tokens_ids_dict[token])
             # append ids of tokenized sample

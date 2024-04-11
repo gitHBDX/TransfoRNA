@@ -21,7 +21,7 @@ from .utils.utils import get_closest_ngbr_per_split
 
 from .dataset.dataset_tcga import PrepareGeneData as DatasetTcga
 from .utils.utils import (get_hp_setting, get_model, infer_from_pd,
-                          prepare_inference_results_tcga)
+                          prepare_inference_results_tcga,update_config_with_inference_params)
 
 warnings.filterwarnings("ignore")
 
@@ -55,51 +55,23 @@ def aggregate_ensemble_model(lev_dist_df:pd.DataFrame):
     return lev_dist_df.reset_index(drop=True)
 
 
-def prepare_inference_config(trained_on:str,model:str,mc_or_sc,logits_flag:bool) -> Tuple[Path, DictConfig]:
-    root_dir = Path(__file__).parents[1].absolute()
-
-    model_cfg = yaml.load((root_dir / "configs/model/transforna.yaml").read_text(), Loader=SafeLoader)
-
-    infer_cfg = yaml.load((root_dir / "configs/inference_settings/default.yaml").read_text(), Loader=SafeLoader)
+def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_models:str):
     transforna_folder = "TransfoRNA_ID"
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
-    
     if mc_or_sc == 'sc':
         target = 'sub_class'
     else:
         target = 'major_class'
-        
-    infer_cfg["model_path"] = f"models/tcga/{transforna_folder}/{target}/{model}/ckpt/model_params_tcga.pt"
 
-    print(f'Models used: {transforna_folder}')
-
-    main_cfg = yaml.load((root_dir / "configs/main_config.yaml").read_text(), Loader=SafeLoader)
-    main_cfg["model"] = model_cfg
-    main_cfg["inference_settings"] = infer_cfg
-    main_cfg["model_name"] = model.lower()
-    main_cfg["inference"] = True
-    main_cfg["log_logits"] = logits_flag
-
-    main_cfg['log_embedds'] = True
-
-    cfg = DictConfig(main_cfg)
-    train_cfg_path = get_hp_setting(cfg, "train_config")
-    model_cfg_path = get_hp_setting(cfg, "model_config")
-    train_config = instantiate(train_cfg_path)
-    model_config = instantiate(model_cfg_path)
-    # prepare configs as structured dicts
-    train_config = OmegaConf.structured(train_config)
-    model_config = OmegaConf.structured(model_config)
-    # update model config with the name of the model
-    model_config["model_input"] = cfg["model_name"]
-    return root_dir,OmegaConf.merge({"train_config": train_config, "model_config": model_config}, cfg)
-    
+    model_path = f"{path_to_models}/{transforna_folder}/{target}/{model}/meta/hp_settings.yaml"
+    cfg = OmegaConf.load(model_path)
+    return cfg
 
 def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sc',\
                     logits_flag:bool = False,attention_flag:bool = False,\
                         similarity_flag:bool=False,n_sim:int=3,embedds_flag:bool = False, \
-                            umap_flag:bool = False,trained_on:str='full') -> pd.DataFrame:
+                            umap_flag:bool = False,trained_on:str='full',path_to_models:str='') -> pd.DataFrame:
     '''
     This function predicts the major class or sub class of a list of sequences using the TransfoRNA model.
     Additionaly, it can return logits, attention scores, similarity scores, gene embeddings or umap embeddings.
@@ -122,7 +94,9 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     assert sum([logits_flag,attention_flag,similarity_flag,embedds_flag,umap_flag]) <= 1, 'One option at most can be True'
     # capitalize the first letter of the model and the first letter after the -
     model = "-".join([word.capitalize() for word in model.split("-")])
-    root_dir,cfg = prepare_inference_config(trained_on,model,mc_or_sc,logits_flag)
+    cfg = read_inference_model_config(model,mc_or_sc,trained_on,path_to_models)
+    cfg = update_config_with_inference_params(cfg,mc_or_sc,trained_on,path_to_models)
+    root_dir = Path(__file__).parents[1].absolute()
 
     with redirect_stdout(None):
         cfg, net = get_model(cfg, root_dir)
@@ -149,13 +123,12 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     elif embedds_flag:
         return gene_embedds_df
 
-    else: #return table with predictions, entropy, threshold, is real
+    else: #return table with predictions, entropy, threshold, is familiar
         #add aa predictions to infer_pd
         embedds_path = '/'.join(cfg['inference_settings']["model_path"].split('/')[:-2])+'/embedds'
         results:Results_Handler = Results_Handler(path=embedds_path,splits=['train'])
         results.get_knn_model()
         lv_threshold = load(results.analysis_path+"/novelty_model_coef")["Threshold"]
-        ent_threshold = load(results.analysis_path+"/logits_model_coef")["Threshold"]
         print(f'computing levenstein distance for the inference set')
         #prepare infer split
         gene_embedds_df.columns = results.embedds_cols[:len(gene_embedds_df.columns)]
@@ -210,7 +183,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
 
 def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logits_flag: bool = False, attention_flag: bool = False,\
         similarity_flag: bool = False, n_sim:int = 3,
-        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full") -> pd.DataFrame:
+        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full",path_to_models:str='') -> pd.DataFrame:
     """
     Predicts the labels of the sequences using all the models available in the transforna package.
     If non of the flags are true, it constructs and aggrgates the output of the ensemble model.
@@ -240,7 +213,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logi
     df = None
     for model in models:
         print(model)
-        df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on)
+        df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_models = path_to_models)
         df_["Model"] = model
         df = pd.concat([df, df_], axis=0)
     #aggregate ensemble model if not of the flags are true
