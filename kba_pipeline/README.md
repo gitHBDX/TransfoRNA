@@ -2,7 +2,8 @@
 
 Most small RNA annotation tools map the sequences sequentially to different small RNA class specific reference databases, which prioritizes the distinct small RNA classes and conceals potential assignment ambiguities. The annotation strategy used here, maps the sequences to the reference sequences of all small RNA classes at the same time starting with zero mismatch tolerance. Unmapped sequences are intended to map with iterating mismatch tolerance up to three mismatches. Additionally, all small RNA sequences are checked for potential bacterial or viral origin, for genomic overlap to human transposable element loci and whether they contain potential prefixes of the 5‘ adapter.
 
-![kba_pipeline_scheme](https://github.com/gitHBDX/TransfoRNA-Framework/assets/79092907/416a1576-5003-4ddf-8650-6c0b9e96413b)
+![kba_pipeline_scheme_v05](https://github.com/gitHBDX/TransfoRNA/assets/79092907/62bf9e36-c7c7-4ff5-b747-c2c651281b42)
+
 
 a) Schematic overview of the knowledge-based annotation (KBA) strategy applied for TransfoRNA. 
 
