@@ -3,8 +3,7 @@ from typing import Dict
 from omegaconf import DictConfig
 
 from ..callbacks.metrics import accuracy_score
-from ..dataset.dataset_benchmark import PrepareGeneData as DatasetBenchmark
-from ..dataset.dataset_tcga import PrepareGeneData as DatasetTcga
+from ..dataset.seq_tokenizer import SeqTokenizer
 from ..score.score import (compute_score_benchmark, compute_score_tcga,
                            infere_additional_test_data)
 from ..utils.utils import *
@@ -42,13 +41,13 @@ def train(cfg:Dict= None,path:str = None):
     #instantiate dataset class
     
     if cfg["task"] in ["premirna","sncrna"]:
-        dataset_class = DatasetBenchmark(ad.var,cfg)
+        dataset_class = SeqTokenizer(ad.var,cfg)
         test_data = load(cfg["train_config"].dataset_path_test)
         #prepare data for training and inference
         all_data = prepare_data_benchmark(dataset_class,test_data,cfg)
     else: 
         ad = append_model_input(ad,cfg)
-        dataset_class = DatasetTcga(ad,cfg)
+        dataset_class = SeqTokenizer(ad.var,cfg)
         all_data = prepare_data_tcga(dataset_class,cfg)
 
     #sync skorch config with params in train and model config

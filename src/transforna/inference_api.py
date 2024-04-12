@@ -19,7 +19,7 @@ from .utils.file import load
 from .utils.tcga_post_analysis_utils import Results_Handler
 from .utils.utils import get_closest_ngbr_per_split
 
-from .dataset.dataset_tcga import PrepareGeneData as DatasetTcga
+from .dataset.seq_tokenizer import SeqTokenizer
 from .utils.utils import (get_hp_setting, get_model, infer_from_pd,
                           prepare_inference_results_tcga,update_config_with_inference_params)
 
@@ -101,7 +101,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     with redirect_stdout(None):
         cfg, net = get_model(cfg, root_dir)
         infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net = infer_from_pd(cfg, net, infer_pd, DatasetTcga,attention_flag)
+        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net = infer_from_pd(cfg, net, infer_pd, SeqTokenizer,attention_flag)
 
         if model == 'Seq':
             gene_embedds_df = gene_embedds_df.iloc[:,:int(gene_embedds_df.shape[1]/2)]

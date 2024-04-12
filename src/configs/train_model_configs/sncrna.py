@@ -8,6 +8,7 @@ from typing import List
 class GeneEmbeddModelConfig:
     # input dim for the embedding and positional encoders
     # as well as all k,q,v input/output dims
+    model_input: str = "seq-struct"
     num_embed_hidden: int = 256
     ff_hidden_dim: List = field(default_factory=lambda: [1200, 800])
     feed_forward1_hidden: int = 1024
@@ -71,6 +72,7 @@ class GeneEmbeddTrainConfig:
     )  # if the corresponding rna/GE appears in the top k, the correctly classified
     label_smoothing: float = 0.0
     cross_val: bool = False
+    filter_seq_length:bool = True
     train_epoch: int = 800
     max_epochs:int = 1000
 

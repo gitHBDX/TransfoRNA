@@ -3,7 +3,7 @@ from typing import Dict
 
 
 from .callbacks.metrics import accuracy_score
-from .dataset.dataset_benchmark import PrepareGeneData as DatasetBenchmark
+from .dataset.seq_tokenizer import SeqTokenizer
 from .score.score import infer_from_model,infer_testset
 from .utils.file import load,save
 from .utils.utils import *
@@ -21,7 +21,7 @@ def infer_benchmark(cfg:Dict= None,path:str = None):
     ad = load(cfg["train_config"].dataset_path_train)
 
     #instantiate dataset class
-    dataset_class = DatasetBenchmark(ad.var,cfg)
+    dataset_class = SeqTokenizer(ad.var,cfg)
     test_data = load(cfg["train_config"].dataset_path_test)
     #prepare data for training and inference
     all_data = prepare_data_benchmark(dataset_class,test_data,cfg)

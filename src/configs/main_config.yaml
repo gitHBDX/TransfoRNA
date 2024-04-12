@@ -6,7 +6,7 @@ task: tcga # tcga,sncrna or premirna or custom (for a custom dataset)
 
 #train settings
 model_name: seq #seq, seq-seq, seq-struct, seq-reverse, seq-exp or baseline
-trained_on: full #full or id
+trained_on: id #full or id
 inference: False   # True or False
 #if inference is true, should the logits be logged?
 log_logits: False

@@ -27,7 +27,7 @@ from skorch.helper import predefined_split
 from yaml.loader import SafeLoader
 
 from ..callbacks.metrics import get_callbacks
-from ..dataset.dataset_tcga import PrepareGeneData as DatasetTcga
+from ..dataset.seq_tokenizer import SeqTokenizer
 from ..score.score import infer_from_model
 from ..utils.file import save
 from ..utils.tcga_post_analysis_utils import Results_Handler
@@ -166,7 +166,7 @@ def predict_transforna_na(config:DictConfig = None) -> Tuple:
         inference_config, net = get_model(inference_config, root_dir)
         infer_pd = pd.Series(sequences, name="Sequences").to_frame()
         print(f'predicting sub classes for the NA set by the ID models')
-        predicted_labels, logits,gene_embedds_df, attn_scores_pd,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, DatasetTcga)
+        predicted_labels, logits,gene_embedds_df, attn_scores_pd,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, SeqTokenizer)
 
 
     prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
@@ -694,29 +694,26 @@ def create_artificial_dataset(size):
     #truncate seqs according to the seq_len distribution
     for seq_idx,seq in enumerate(artificial_seqs):
         artificial_seqs[seq_idx] = seq[0:artificial_seqs_length[seq_idx]]
-    #create anndata with seqs, zero expression and secondary structure
-    adata = anndata.AnnData(X= np.zeros((size["exp"],len(artificial_seqs))))
+   
 
-    adata.var["Sequences"]= artificial_seqs
+    artificial_secondary = fold_sequences(artificial_seqs,temperature=37)[f'structure_37'].values
 
-    adata.var["Secondary"] = fold_sequences(artificial_seqs,temperature=37)[f'structure_37'].values
-
-    adata.var["Labels"] = 0
-    return adata
+    artificial_df = pd.DataFrame({'Sequences':artificial_seqs,'Secondary':artificial_secondary,'Labels':0})
+    return artificial_df
 
 def prepare_artificial_data(dataset_class,size,device):
     #create artificial dataset based on uniform sampling of nucleotides
-    adata_artificial = create_artificial_dataset(size)
-    dataset_class.ad = adata_artificial
-    artificial_df = dataset_class.get_preprocessed_data_df().sample(frac=1)
+    artificial_df = create_artificial_dataset(size)
+    dataset_class.seqs_dot_bracket_labels = artificial_df
+    processed_artificial_df = dataset_class.get_preprocessed_data_df().sample(frac=1)
     model_input_cols = ['tokens_id','second_input','seqs_length']
-    artificial_data = convert_to_tensor(artificial_df[model_input_cols].values,convert_type=float,device=device)
+    artificial_data = convert_to_tensor(processed_artificial_df[model_input_cols].values,convert_type=float,device=device)
     art_weights =  convert_to_tensor(np.ones(artificial_data.shape[0]),convert_type=float,device=device)
     artificial_data = torch.cat([artificial_data,art_weights[:,None]],dim=1)
 
-    artificial_labels_numeric =convert_to_tensor(np.zeros((artificial_df['Labels'].shape[0])), convert_type=int,device=device)
-    artificial_labels = artificial_df['Labels']
-    artificial_rna_seq = adata_artificial.var[["Sequences"]]
+    artificial_labels_numeric =convert_to_tensor(np.zeros((processed_artificial_df['Labels'].shape[0])), convert_type=int,device=device)
+    artificial_labels = processed_artificial_df['Labels']
+    artificial_rna_seq = artificial_df[["Sequences"]]
     return {"artificial_data":artificial_data,
             "artificial_labels":artificial_labels,
             "artificial_labels_numeric":artificial_labels_numeric,
@@ -763,7 +760,7 @@ def prepare_data_tcga(dataset_class, configs):
     splits_seqs_dict = get_seqs_per_split(splits_df_dict,configs)
 
     #get desired artificial data split
-    size_dict = {"exp":dataset_class.ad.shape[0],
+    size_dict = {
                 "seq_len_dist":dataset_class.seq_len_dist,
                 "num_seqs":200}
     artificial_data_dict = prepare_artificial_data(dataset_class,size_dict,device)
@@ -1347,7 +1344,7 @@ def infer_from_pd(cfg,net,infer_pd,DataClass,attention_flag:bool=False):
         
         
     #create dataclass to tokenize infer sequences
-    dataset_class = DataClass(infer_ad,cfg)
+    dataset_class = DataClass(infer_ad.var,cfg)
     #update datasetclass with tokenization dicts and tokens_len
     dataset_class = update_dataclass_inference(cfg,dataset_class)
     #tokenize sequences

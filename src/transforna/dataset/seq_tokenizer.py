@@ -1,70 +1,58 @@
 
-import warnings
-from random import randint
-
 import numpy as np
 import pandas as pd
-from anndata import AnnData
-from numpy.lib.stride_tricks import as_strided
-from omegaconf import DictConfig
-from sklearn.base import BaseEstimator, TransformerMixin
-
 from ..utils import energy
-from ..utils.logger import log
+from random import randint
+import warnings
+from omegaconf import DictConfig
+import math
+from numpy.lib.stride_tricks import as_strided
 
-class PrepareGeneData:
-    def __init__(self, ad: AnnData, config: DictConfig):
 
-        self.ad = ad
+class SeqTokenizer:
+    '''
+    This class should contain functions that other data specific classes should inherit from.
+    '''
+    def __init__(self,seqs_dot_bracket_labels: pd.DataFrame, config: DictConfig):
+
+        self.seqs_dot_bracket_labels = seqs_dot_bracket_labels
+        #shuffle
+        self.seqs_dot_bracket_labels = self.seqs_dot_bracket_labels\
+            .sample(frac=1)\
+            .reset_index(drop=True)
         
         #get input of model
         self.model_input = config["model_config"].model_input
-        #secondary str/sequences is sometimes read as category which causes issues when filtering,
-        #instead convert to object
-        self.ad.var["Sequences"] = ad.var["Sequences"].astype(object)
-        if 'struct' in self.model_input:
-            self.ad.var["Secondary"] = ad.var["Secondary"].astype(object)
 
-        
+
         # set max length to be <= 2 stds of distribtion of lengths
         if config["train_config"].filter_seq_length:
             self.get_outlier_length_threshold()
             self.limit_seqs_to_range()
         else:
-            self.max_length = self.ad.var['Sequences'].str.len().max()
+            self.max_length = self.seqs_dot_bracket_labels['Sequences'].str.len().max()
             self.min_length = 0
         
-        self.seq_len_dist = self.ad.var['Sequences'].str.len().value_counts()
+        self.window = config["model_config"].window    
+        self.tokens_len = math.ceil(self.max_length / self.window)
+        if config["model_config"].tokenizer in ["overlap", "overlap_multi_window"]:
+            self.tokens_len = int(self.max_length - (config["model_config"].window - 1))
+        self.tokenizer = config["model_config"].tokenizer
+        
 
-
-
-
+        self.seq_len_dist = self.seqs_dot_bracket_labels['Sequences'].str.len().value_counts()
         #init tokens dict
         self.seq_tokens_ids_dict = {}
         self.second_input_tokens_ids_dict = {}
 
-        #set num of tokens per sequence
-        self.window = config["model_config"].window
-        #if token is ACT, then tokens: AC and CT
-        self.tokens_len = int(self.max_length - (self.window - 1))
+        #get and set number of labels in config to be used later by the model
+        config["model_config"].num_classes = len(self.seqs_dot_bracket_labels['Labels'].unique())
 
-        self.shuffle_exp = config["train_config"].shuffle_exp
-        
-    def get_balanced_ad(self,ad,number_samples_threshold = 34):
-        ids_list = []
-        ctrl_tissue_num = 0
-        for cancer_type in ad.obs['disease_type'].unique():
-            #get control samples per cancer type
-            ctrl_samples_per_cancer_type = ad[ad.obs['disease_type'] == cancer_type].obs['sample_type_definition'].isin(['Solid Tissue Normal'])
-            #if the number of samples per cancer type is > thresh, then take at most number_samples_threshold samples
-            if sum(ctrl_samples_per_cancer_type) >= number_samples_threshold:
-                ids_list.extend(ctrl_samples_per_cancer_type[ctrl_samples_per_cancer_type].index[:55])
-                ctrl_tissue_num+=1
-        print(f"number of control tissues chosen are: {ctrl_tissue_num} with total samples:{len(ids_list)}")
-        return ad[ids_list]
+        self.set_class_attr()
+
 
     def get_outlier_length_threshold(self):
-        lengths_arr = self.ad.var['Sequences'].str.len()
+        lengths_arr = self.seqs_dot_bracket_labels['Sequences'].str.len()
         mean = np.mean(lengths_arr)
         standard_deviation = np.std(lengths_arr)
         distance_from_mean = abs(lengths_arr - mean)
@@ -80,48 +68,40 @@ class PrepareGeneData:
         '''
         Trimms seqs longer than maximum len and deletes seqs shorter than min length
         '''
+        df = self.seqs_dot_bracket_labels
         min_to_be_deleted = []
-        for idx,seq in enumerate(self.ad.var['Sequences']):
+        for idx,seq in enumerate(df['Sequences']):
             if len(seq) > self.max_length:
-                self.ad.var['Sequences'].iloc[idx] = \
-                    self.ad.var['Sequences'].iloc[idx][:self.max_length]
-                if 'struct' in self.model_input:
-                    self.ad.var['Secondary'].iloc[idx] = \
-                        self.ad.var['Secondary'].iloc[idx][:self.max_length]
+                df['Sequences'].iloc[idx] = \
+                    df['Sequences'].iloc[idx][:self.max_length]
+                try:
+                    df['Secondary'].iloc[idx] = \
+                        df['Secondary'].iloc[idx][:self.max_length]
+                except:
+                    pass
             elif len(seq) < self.min_length:
                 #deleted sequence indices
                 min_to_be_deleted.append(str(idx))
         #delete min sequences
         if len(min_to_be_deleted):
-            self.ad = self.ad[:,self.ad.var.drop(min_to_be_deleted).index]
-            self.ad.var = self.ad.var.reset_index(drop=True)
-
-    def set_class_attr(self):
-        #set seq,struct and exp and labels
-        self.seq = self.ad.var["Sequences"]
-        if 'struct' in self.model_input:
-            self.struct = self.ad.var["Secondary"]
-        self.exp = self.ad.X
-        self.labels = self.ad.var['Labels']
-
+            df = df.drop(min_to_be_deleted).reset_index(drop=True)
+        self.seqs_dot_bracket_labels = df
+    
     def get_secondary_structure(self,sequences):
         secondary = energy.fold_sequences(sequences.tolist())
         return secondary['structure_37'].values
-
- 
+    
     # function generating non overlapping tokens of a feature sample
     def chunkstring_overlap(self, string, window):
         return (
             string[0 + i : window + i] for i in range(0, len(string) - window + 1, 1)
         )
-    # function to return key for any value
-    def get_key(self,input_dict,val):
-        for key, value in input_dict.items():
-             if val == value:
-                 return key
-        return "key doesn't exist"
+    # function generating non overlapping tokens of a feature sample
+    def chunkstring_no_overlap(self, string, window):
+        return (string[0 + i : window + i] for i in range(0, len(string), window))
+    
 
-    def tokenize_samples(self, window,sequences_to_be_tokenized,inference:bool=False) -> np.ndarray:
+    def tokenize_samples(self, window:int,sequences_to_be_tokenized:pd.DataFrame,inference:bool=False,tokenizer:str="overlap") -> np.ndarray:
         """
         This function tokenizes rnas based on window(window)
         with or without overlap according to the current tokenizer option.
@@ -134,17 +114,21 @@ class PrepareGeneData:
         output: AAC,TAG,A
         """
         # get feature tokens
-
-        feature_tokens_gen = list(
-            self.chunkstring_overlap(feature, window)
-            for feature in sequences_to_be_tokenized
-        )
+        if "overlap" in tokenizer:
+            feature_tokens_gen = list(
+                self.chunkstring_overlap(feature, window)
+                for feature in sequences_to_be_tokenized
+            )
+        elif tokenizer == "no_overlap":
+            feature_tokens_gen = list(
+                self.chunkstring_no_overlap(feature, window) for feature in sequences_to_be_tokenized
+            )
         # get sample tokens and pad them
         samples_tokenized = []
         sample_token_ids = []
         if not self.seq_tokens_ids_dict:
             self.seq_tokens_ids_dict = {"pad": 0}
-
+            
         for gen in feature_tokens_gen:
             sample_token_id = []
             sample_token = list(gen)
@@ -164,7 +148,7 @@ class PrepareGeneData:
                         #if new token found during inference, then select random token (considered as noise)
                         warnings.warn(f"The sequence token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.seq_tokens_ids_dict.keys()) - 1)
-                        token = self.get_key(self.seq_tokens_ids_dict,id)
+                        token = self.seq_tokens_ids_dict[id]
                 # append id of token
                 sample_token_id.append(self.seq_tokens_ids_dict[token])
 
@@ -175,8 +159,8 @@ class PrepareGeneData:
             samples_tokenized.append(sample_token)
         # save vocab
         return (np.array(samples_tokenized), np.array(sample_token_ids))
-
-    def tokenize_secondary_structure(self, window,sequences_to_be_tokenized,inference:bool=False) -> np.ndarray:
+    
+    def tokenize_secondary_structure(self, window,sequences_to_be_tokenized,inference:bool=False,tokenizer= "overlap") -> np.ndarray:
         """
         This function tokenizes rnas based on window(window)
         with or without overlap according to the current tokenizer option.
@@ -194,11 +178,15 @@ class PrepareGeneData:
             self.second_input_tokens_ids_dict = {"pad": 0}
 
         # get feature tokens
-        feature_tokens_gen = list(
-            self.chunkstring_overlap(feature, window)
-            for feature in sequences_to_be_tokenized
-        )
-
+        if "overlap" in tokenizer:
+            feature_tokens_gen = list(
+                self.chunkstring_overlap(feature, window)
+                for feature in sequences_to_be_tokenized
+            )
+        elif "no_overlap" == tokenizer:
+            feature_tokens_gen = list(
+                self.chunkstring_no_overlap(feature, window) for feature in sequences_to_be_tokenized
+            )
         # get sample tokens and pad them
         for seq_idx, gen in enumerate(feature_tokens_gen):
             sample_token_id = []
@@ -215,7 +203,7 @@ class PrepareGeneData:
                         #if new token found during inference, then select random token (considered as noise)
                         warnings.warn(f"The secondary structure token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.second_input_tokens_ids_dict.keys()) - 1)
-                        token = self.get_key(self.second_input_tokens_ids_dict,id)
+                        token = self.second_input_tokens_ids_dict[id]
                 # append id of token
                 sample_token_id.append(self.second_input_tokens_ids_dict[token])
             # append ids of tokenized sample
@@ -237,8 +225,15 @@ class PrepareGeneData:
             sample_token_ids[seq_idx] = np.array(sample_token_ids[seq_idx])
             samples_tokenized[seq_idx] = np.array(samples_tokenized[seq_idx])
         # save vocab
-        return (samples_tokenized, np.array(sample_token_ids))
+        return (samples_tokenized, sample_token_ids)
+    
+    def set_class_attr(self):
+        #set seq,struct and exp and labels
+        self.seq = self.seqs_dot_bracket_labels["Sequences"]
+        if 'struct' in self.model_input:
+            self.struct = self.seqs_dot_bracket_labels["Secondary"]
 
+        self.labels = self.seqs_dot_bracket_labels['Labels']
 
     def prepare_multi_idx_pd(self,num_coln,pd_name,pd_value):
         iterables = [[pd_name], np.arange(num_coln)]
@@ -269,8 +264,6 @@ class PrepareGeneData:
         return result[np.arange(arr.shape[0]), (n-m)%n]
 
     def get_preprocessed_data_df(self,inference:bool=False):
-        #insures that seq,struct and exp are always updated with each tokenized split
-        self.set_class_attr()
         #tokenize sequences
         samples_tokenized,sample_token_ids = self.tokenize_samples(self.window,self.seq,inference)
 
@@ -299,15 +292,6 @@ class PrepareGeneData:
             _,sec_str_token_ids = self.tokenize_secondary_structure(self.window,self.struct,inference)
             sec_input_value = sec_str_token_ids
 
-        #add exp if used
-        if "exp" in self.model_input:
-            gene_exp = self.ad.X
-            #shuffle both rows and columns
-            if self.shuffle_exp:
-                np.random.shuffle(gene_exp.T)
-                np.random.shuffle(gene_exp)
-
-            sec_input_value = gene_exp.transpose()
 
         #add seq-seq if used
         if "seq-seq" in self.model_input:
@@ -335,6 +319,5 @@ class PrepareGeneData:
         seqs_length_df = self.prepare_multi_idx_pd(1,"seqs_length",seqs_length)
 
         all_df = labels_df.join(tokens_df).join(tokens_id_df).join(sec_input_df).join(seqs_length_df)
-        if not inference:
-            all_df = all_df.sample(frac=1)
+
         return all_df

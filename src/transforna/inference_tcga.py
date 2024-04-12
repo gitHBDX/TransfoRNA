@@ -2,7 +2,7 @@
 from typing import Dict
 from .utils.file import load
 from .utils.utils import *
-from .dataset.dataset_tcga import PrepareGeneData as DatasetTcga
+from .dataset.seq_tokenizer import SeqTokenizer
 from pathlib import Path
 
 def infer_tcga(cfg:Dict= None,path:str = None):
@@ -11,7 +11,7 @@ def infer_tcga(cfg:Dict= None,path:str = None):
     cfg,net = get_model(cfg,path)
     inference_path = Path(__file__).parents[2].absolute()
     infer_pd = load(inference_path / cfg["inference_settings"]["sequences_path"],index_col=0)
-    predicted_labels,logits,_,_,all_data,max_len,net = infer_from_pd(cfg,net,infer_pd,DatasetTcga)
+    predicted_labels,logits,_,_,all_data,max_len,net = infer_from_pd(cfg,net,infer_pd,SeqTokenizer)
     #create inference_output if it does not exist
     if not os.path.exists(f"{inference_path}/inference_output"):
         os.makedirs(f"{inference_path}/inference_output")
