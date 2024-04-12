@@ -9,6 +9,7 @@ from skorch.callbacks.scoring import ScoringBase, _cache_net_forward_iter
 from skorch.callbacks.training import Checkpoint
 
 from .LRCallback import LearningRateDecayCallback
+
 writer = None
 
 def accuracy_score(y_true, y_pred: torch.tensor,task:str=None,mirna_flag:bool = False):

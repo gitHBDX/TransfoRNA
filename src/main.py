@@ -1,12 +1,13 @@
 import os
-from dataclasses import asdict
 import warnings
+from dataclasses import asdict
+
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from transforna.inference_tcga import infer_tcga
 from transforna.inference_benchmark import infer_benchmark
+from transforna.inference_tcga import infer_tcga
 from transforna.train.train import compute_cv, train
 
 warnings.filterwarnings("ignore")

@@ -11,7 +11,6 @@ import anndata
 import numpy as np
 import pandas as pd
 import torch
-import yaml
 from anndata import AnnData
 from hydra._internal.utils import _locate
 from hydra.utils import instantiate
@@ -24,7 +23,6 @@ from sklearn.utils.class_weight import (compute_class_weight,
                                         compute_sample_weight)
 from skorch.dataset import Dataset
 from skorch.helper import predefined_split
-from yaml.loader import SafeLoader
 
 from ..callbacks.metrics import get_callbacks
 from ..dataset.seq_tokenizer import SeqTokenizer
@@ -183,9 +181,6 @@ def predict_transforna_na(config:DictConfig = None) -> Tuple:
     print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
     return infer_pd.rename_axis("Sequence").reset_index()
     
-    
-
-
 def set_seed_and_device(seed:int = 0,device_no:int=0):
     # set seed
     torch.backends.cudnn.deterministic = True
@@ -462,20 +457,10 @@ def remove_fewer_samples(min_num_samples,selected_classes_df):
     selected_classes_df = selected_classes_df[~fewer_ids]
     return fewer_samples_per_class_df,selected_classes_df
 
-def augment_exp(train_df,num_shuffles):
-    pds_list = []
-    for num_shuffle in range(num_shuffles):
-        train_df_copy = train_df.copy()
-        train_df_copy['second_input'] = train_df['second_input'].sample(frac=1, axis=1,random_state=num_shuffle).values
-        pds_list.append(train_df_copy)
-    if num_shuffles > 0:
-        return train_df.append(pd.concat(pds_list)).reset_index(drop=True)
-    else:
-        return train_df
 
 def split_tcga_data_keep_all_sc(selected_classes_df,configs):
     #remove artificial_affix
-    ood_df = selected_classes_df.loc[selected_classes_df['Labels'][0].isin(['random','fusion','artificial_affix'])]
+    ood_df = selected_classes_df.loc[selected_classes_df['Labels'][0].isin(['random','recombined','artificial_affix'])]
     art_affix_ids = selected_classes_df.index.isin(ood_df.index)
     selected_classes_df = selected_classes_df[~art_affix_ids]
     selected_classes_df = selected_classes_df.reset_index(drop=True)
@@ -515,10 +500,6 @@ def split_tcga_data_keep_all_sc(selected_classes_df,configs):
     train_df = train_df[~ood_3_ids]
 
 
-    #shuffled exp
-    if 'exp' in configs.model_config.model_input:
-        num_shuffles = configs.train_config.num_augment_exp
-        train_df = augment_exp(train_df,num_shuffles)
 
     #train_df is the selected_classes_df in case of full as no train/val/test split should take place
     #sample 1 sample per each label in valid_df and test_df
@@ -569,10 +550,6 @@ def split_tcga_data(selected_classes_df,configs):
     # PLUS appending the oo_1_df
     ood_df = ood_0_df.append(ood_1_df).append(ood_2_df).append(ood_3_df)
 
-    #shuffled exp
-    if 'exp' in configs.model_config.model_input:
-        num_shuffles = configs.train_config.num_augment_exp
-        train_df = augment_exp(train_df,num_shuffles)
 
     splits_df_dict = {"train_df":train_df,"valid_df":valid_df,"test_df":test_df,"ood_df":ood_df,"no_annotaiton_df":no_annotaton_df}
     return splits_df_dict
@@ -595,8 +572,7 @@ def update_config_with_dataset_params_tcga(dataset_class,all_data_df,configs):
       check forward function of RNATransformer
     '''
     if configs["model_name"] == "seq-exp":
-        configs["model_config"]["num_embed_hidden"] = 30
-    
+        configs["model_config"]["num_embed_hidden"] = 30 
 
 def append_sample_weights(splits_df_dict,splits_features_dict,device):
 
@@ -790,11 +766,6 @@ def prepare_data_tcga(dataset_class, configs):
     save(data = dataset_class.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
     return all_data
 
-def load_precursor_file(cfg:dict):
-    precursor_df = pd.read_csv(cfg['train_config'].precursor_file_path, index_col=0)
-    precursor_df.loc[:,'precursor_bins'] = (precursor_df.precursor_length/25).astype(int)
-    return precursor_df
-
 def introduce_mismatches(seq, n_mismatches):
     seq = list(seq)
     for i in range(n_mismatches):
@@ -802,393 +773,6 @@ def introduce_mismatches(seq, n_mismatches):
         seq[rand_nt] = ['A','G','C','T'][randint(0,3)]
     return ''.join(seq)
 
-def compute_dynamic_bin_size(precursor_len:int, name:str=None, min_bin_size:int=20, max_bin_size:int=30) -> List[int]:
-    '''
-    This function splits precursor to bins of size max_bin_size
-    if the last bin is smaller than min_bin_size, it will split the precursor to bins of size max_bin_size-1
-    This process will continue until the last bin is larger than min_bin_size.
-    if the min bin size is reached and still the last bin is smaller than min_bin_size, the last two bins will be merged.
-    so the maximimum bin size possible would be min_bin_size+(min_bin_size-1) = 39
-    '''
-    def split_precursor_to_bins(precursor_len,max_bin_size):
-        '''
-        This function splits precursor to bins of size max_bin_size
-        '''
-        precursor_bin_lens = []
-        for i in range(0, precursor_len, max_bin_size):
-            if i+max_bin_size < precursor_len:
-                precursor_bin_lens.append(max_bin_size)
-            else:
-                precursor_bin_lens.append(precursor_len-i)
-        return precursor_bin_lens
-
-    if precursor_len < min_bin_size:
-        return [precursor_len]
-    else:
-        precursor_bin_lens = split_precursor_to_bins(precursor_len,max_bin_size)
-        reduced_len = max_bin_size-1
-        while precursor_bin_lens[-1] < min_bin_size:
-            precursor_bin_lens = split_precursor_to_bins(precursor_len,reduced_len)
-            reduced_len -= 1
-            if reduced_len < min_bin_size:
-                #add last two bins together
-                precursor_bin_lens[-2] += precursor_bin_lens[-1]
-                precursor_bin_lens = precursor_bin_lens[:-1]
-                break
-
-        return precursor_bin_lens
-
-
-def get_bin_with_max_overlap(precursor_len:int,start_frag_pos:int,frag_len:int,name,min_bin_size=20,max_bin_size:int=30) -> int:
-    '''
-    This function returns the bin number of a fragment that overlaps the most with the fragment
-    '''
-    precursor_bin_lens = compute_dynamic_bin_size(precursor_len=precursor_len,name=name,min_bin_size=min_bin_size,max_bin_size=max_bin_size)
-    bin_no = 0
-    for i,bin_len in enumerate(precursor_bin_lens):
-        if start_frag_pos < bin_len:
-            #get overlap with curr bin
-            overlap = min(bin_len-start_frag_pos,frag_len)
-
-            if overlap > frag_len/2:
-                bin_no = i
-            else:
-                bin_no = i+1
-            break
-
-        else:
-            start_frag_pos -= bin_len
-    return bin_no+1
-
-def get_precursor_info(precursor_df:pd.DataFrame,mc:str,sc:str):
-
-    xRNA_df = precursor_df.loc[precursor_df.sRNA_class == mc]
-    xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
-    prec_name = sc.split('_bin-')[0]
-    bin_no = int(sc.split('_bin-')[1])
-
-    if mc in ['snoRNA','lncRNA','protein_coding']:
-        prec_name = mc+'-'+prec_name
-        prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
-        #check if prec_row_df is empty
-        if prec_row_df.empty:
-            xRNA_df = precursor_df.loc[precursor_df.sRNA_class == 'pseudo_'+mc]
-            xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
-            prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
-            if prec_row_df.empty:
-                print(f'precursor {prec_name} not found in HBDxBase')
-                return pd.DataFrame()
-
-        prec_row_df = prec_row_df.iloc[0]
-    else:
-        prec_row_df = xRNA_df.loc[f'{mc}-{prec_name}']
-
-    precursor = prec_row_df.sequence
-    return precursor,prec_name
-
-def populate_from_bin(sc:str,mc:str,precursor:str,prec_name:str,existing_seqs:List[str]):
-    '''
-    This function will first get the bin no from the sc. 
-    Then it will do three types of sampling:
-    1. sample from the previous bin, insuring that the overlap with the middle bin is the highest
-    2. sample from the next bin, insuring that the overlap with the middle bin is the highest
-    3. sample from the middle bin, insuring that the overlap with the middle bin is the highest
-    The staet idx should be the middle position of the previous bin, then start position is incremented until the end of the current bin
-    '''
-    bin_no = int(sc.split('_bin-')[1])
-    bins = compute_dynamic_bin_size(len(precursor), prec_name, 20, 30)
-    if len(bins) == 1:
-        return pd.DataFrame()
-    
-    #bins start from 1 so should subtract 1
-    bin_no -= 1
-
-    #in case bin_no is 0
-    try:
-        previous_bin_start = sum(bins[:bin_no-1])
-    except:
-        previous_bin_start = 0
-    middle_bin_start = sum(bins[:bin_no])
-    next_bin_start = sum(bins[:bin_no+1])
-
-
-    try:
-        previous_bin_size = bins[bin_no-1]
-    except:
-        previous_bin_size = 0
-
-    middle_bin_size = bins[bin_no]
-    try: 
-        next_bin_size = bins[bin_no+1]
-    except:
-        next_bin_size = 0
-
-
-    start_idx = previous_bin_start + previous_bin_size//2 + 1 #+1 to make sure max overlap with prev bin is 14. max len/2 - 1
-    sampled_seqs = []
-    #increase start idx until the end of the current bin
-    while start_idx < middle_bin_start+middle_bin_size:
-        #compute the boundaries of the length of the fragment so that it would always overlap with the middle bin the most
-        if start_idx < middle_bin_start:
-            max_overlap_prev = middle_bin_start - start_idx
-            end_idx = start_idx + randint(max(18,max_overlap_prev*2+1),30)
-        else:# start_idx >= middle_bin_start:
-            max_overlap_curr = next_bin_start - start_idx
-            max_overlap_next = (start_idx + 30) - next_bin_start
-            max_overlap_next = min(max_overlap_next,next_bin_size)
-            if max_overlap_curr <= 9 or (max_overlap_next==0 and max_overlap_curr < 18):
-                end_idx = -1
-            else:
-                end_idx = start_idx + randint(18,min(30,30 - max_overlap_next + max_overlap_curr - 1))
-        #max overlap with the middle bin will never exceed half of min fragment (9) or,
-        #  next bin size is 0 so frag will be shorter than 18
-        if end_idx == -1:
-            break
-
-        tmp_seq = precursor[start_idx:end_idx]
-        #introduce mismatches
-        assert len(tmp_seq) >= 18 and len(tmp_seq) <= 30, f'length of tmp_seq is {len(tmp_seq)}'
-        if tmp_seq not in existing_seqs:
-            sampled_seqs.append(tmp_seq)
-        start_idx += 1
-    
-    #assertions
-    for frag in sampled_seqs:
-        all_occ = precursor.find(frag)
-        if not isinstance(all_occ,list):
-            all_occ = [all_occ]
-        
-        for occ in all_occ:
-            curr_bin_no = get_bin_with_max_overlap(len(precursor),occ,len(frag),' ')
-            # if curr_bin_no is different from bin_no+1 with more than 2 skip assertion
-            if abs(curr_bin_no - (bin_no+1)) > 1:
-                continue
-            assert curr_bin_no == bin_no+1, f'curr_bin_no is {curr_bin_no} and bin_no is {bin_no+1}'
-    
-    #introduct mismatches
-    #for i in range(len(sampled_seqs)):
-    #    sampled_seqs[i] = introduce_mismatches(sampled_seqs[i], randint(1,2))
-        
-    return pd.DataFrame(index=sampled_seqs, data=[sc]*len(sampled_seqs)\
-        , columns =['Labels'])
-
-   
-def augment_fusion(ad,fusion_label:str='fusion'):
-    # one set of sequences should be generated 
-    #1 - n real RNAs fused together. n is the number of int(subclasses/2)
-
-    #for set 1, sample one sequence from each subclass
-    #sample one sequennce from each unique entry in ad.var.Labels
-    #select rows where Labels is not None
-
-    #filter rows where Labels is None
-    #get unique labels
-    unique_labels = ad.var[ad.var['Labels'].notnull()].Labels.unique()
-    #get one sequence per label in one line
-    samples = [ad.var[ad.var['Labels'] == label].sample(1).index[0] for label in unique_labels]
-    #makes number of samples even
-    if len(samples) % 2 != 0:
-        samples = samples[:-1]
-    np.random.shuffle(samples)
-    #split samples into two sets
-    samples_set1 = samples[:len(samples)//2]
-    samples_set2 = samples[len(samples)//2:]
-    #create fusion set
-    fusion_set = []
-    for i in range(len(samples_set1)):
-        fused_seq = samples_set1[i]+samples_set2[i]
-        #get index of the first ntd of the second sequence
-        fused_index = len(samples_set1[i])
-        #sample a random offset -5 and 5
-        offset = randint(-5,5)
-        fused_index += offset
-        #sample an int between 18 and 30
-        random_half_len = int(randint(18,30)/2) #9 to 15
-        #get the sequence from the fused sequence
-        random_seq = fused_seq[max(0,fused_index - random_half_len):fused_index + random_half_len]
-        fusion_set.append(random_seq)
-    
-    fusion_df = pd.DataFrame(index=fusion_set, data=[f'{fusion_label}']*len(fusion_set)\
-        , columns =['Labels'])
-
-    return fusion_df
-
-    
-def populate_scs_with_bins(ad:AnnData,precursor_df:pd.DataFrame,mapping_dict:Dict,min_num_samples_per_sc:int=1,trained_on:str='id'):
-    augmented_df = pd.DataFrame()
-    #append samples per sc for bin continuity
-    unique_labels = ad.var.Labels.value_counts()[ad.var.Labels.value_counts() >= min_num_samples_per_sc].index.tolist()
-    scs_list = []
-    scs_before = []
-    sc_after = []
-    for sc in unique_labels:
-        #retrieve_bin_from_precursor(other_sc_df,mapping_dict,sc)
-        if type(sc) == str and '_bin-' in sc:
-            #get mc
-            try:
-                mc = mapping_dict[sc]
-            except:
-                sc_mc_mapper = lambda x: 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else None
-                mc = sc_mc_mapper(sc)
-                if mc is None:
-                    print(f'No mapping for {sc}')
-                    continue
-            existing_seqs = ad.var[ad.var['Labels'] == sc].index
-            scs_list.append(sc)
-            scs_before.append(len(existing_seqs))
-            #augment fragments from prev or consecutive bin
-            precursor,prec_name = get_precursor_info(precursor_df,mc,sc)
-            sc2_df = populate_from_bin(sc,mc,precursor,prec_name,existing_seqs)
-            augmented_df = augmented_df.append(sc2_df)
-            sc_after.append(len(sc2_df))
-    #make a dict of scs and number of samples before and after augmentation
-    scs_dict = {'sc':scs_list,'before':scs_before,'after':sc_after}
-    scs_df = pd.DataFrame(scs_dict)
-    scs_df.to_csv(f'scs_{trained_on}_df.csv')
-    return augmented_df
-
-def combine_var(ad:AnnData,new_var_df:pd.DataFrame):
-    #remove any sequences in augmented_df that exist in ad.var
-    duplicated_df = new_var_df[new_var_df.index.isin(ad.var.index)]
-    #log
-    if len(duplicated_df):
-        print(f'Number of duplicated sequences to be removed from ad: {duplicated_df.shape[0]}')
-
-    new_var_df = new_var_df[~new_var_df.index.isin(ad.var.index)].sample(frac=1)
-
-    for col in ad.var.columns:
-        if col not in new_var_df.columns:
-            new_var_df[col] = np.nan
-
-    both_df = new_var_df.append(ad.var)
-    #make anndata from new_var_df
-    both_ad = anndata.AnnData(X= np.zeros((ad.X.shape[0],both_df.shape[0])))
-    both_ad.var = both_df
-    both_ad.obs = ad.obs
-    ad = both_ad
-    ad.var.index = ad.var.index.str.upper()  
-    ad.var.Labels = ad.var.Labels.astype('category')
-    return ad  
-
-def retrieve_bin_from_precursor(HBDxBase_df:pd.DataFrame,mapping_dict:Dict,sub_class:str):
-    '''
-    This function recieves a sub class in the form of majorclass_bin-bin_no
-    it first gets the precursor and then computes the bins by calling compute_dynamic_bin_size, then accesses the bin_no of the 
-    precursor and returns the sequence in the bin
-    '''
-    try:
-        major_class = mapping_dict[sub_class]
-    except:
-        major_class = None
-        seq_in_bin = None
-
-    if major_class:
-        if '_bin-' in sub_class:
-            bin_no = int(sub_class.split('_bin-')[-1])
-            precursor,_ = get_precursor_info(HBDxBase_df,major_class,sub_class)
-            bins = compute_dynamic_bin_size(len(precursor), sub_class, 20, 30)
-            seq_in_bin = precursor[sum(bins[:bin_no-1]):sum(bins[:bin_no])]
-        elif 'mir' in sub_class.lower() or 'let' in sub_class.lower():
-            mc = '-'.join(sub_class.lower().split('-')[:-1])
-            p3_or_p5 = sub_class.lower().split('-')[-1]
-            HBDxBase_df.loc[f'miRNA|{mc}']
-
-
-        elif 'tRNA' == major_class:
-            seq_in_bin = None
-
-    return seq_in_bin
-
-def append_model_input(ad:AnnData,config:Dict) -> AnnData:
-    model_config = config['model_config']
-    if model_config.clf_target == 'sub_class':
-        #only get the first annotation
-        ad.var['Labels'] = ad.var['subclass_name'].str.split(';', expand=True)[0]
-    elif model_config.clf_target == 'major_class':
-        #only get the first annotation
-        ad.var['Labels'] = ad.var['small_RNA_class_annotation'].str.split(';', expand=True)[0]
-    elif model_config.clf_target == 'sub_class_hico':
-        ad.var['Labels'] = ad.var['subclass_name'][ad.var['hico'] == True]
-        mc_or_sc = 'sc'
-    elif model_config.clf_target == 'major_class_hico':
-        #we populate the labels with the sub class, just to insure that the same labels are used for training subclass and major class for id and full models
-        #then we change the sub class to major class in prepare_data_tcga
-        ad.var['Labels'] = ad.var['subclass_name'][ad.var['hico'] == True]
-        mc_or_sc = 'mc'
-
-    
-    try:
-        precursor_df = load_precursor_file(config)
-    except:
-        print('Base file containing precursors could not be loaded')
-
-    mapping_dict = load(config['train_config'].mapping_dict_path)
-
-    if config.trained_on == 'id':
-        #8 is the minimum number of samples per sc so that train_df gets 6, valid 1 and test 1. refer to split_tcga_data
-        try:
-            augmented_df = populate_scs_with_bins(ad,precursor_df,mapping_dict,min_num_samples_per_sc=8,trained_on=config.trained_on)
-            ad = combine_var(ad,augmented_df)
-        except:
-            print('Could not sample from precursors')
-        
-        if mc_or_sc == 'mc':
-            #convert ad.var.Labels to major class using mapping_dict and then to category
-            ad.var['Labels'] = ad.var['Labels'].map(mapping_dict).astype('category')
-
-
-    if config.trained_on == 'full':
-        try:
-            df = predict_transforna_na(config)
-        except:
-            df = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
-            print('Could not load predictions from TransForNA, check if ID models exist in the desired structure')
-
-        set1 = set(ad.var.Labels.cat.categories)
-        set2 = set(df['Net-Label'].unique())
-        ad.var['Labels'] = ad.var['Labels'].cat.add_categories(set2.difference(set1))
-        ad.var.loc[df[df['Is Familiar?'] == True].Sequence.values,'Labels'] = df[df['Is Familiar?'] == True]['Net-Label'].values
-
-        #create random sequences from bases: A,C,G,T with length 18-30
-        random_seqs = []
-        while len(random_seqs) < 500:
-            random_seq = ''.join(random.choices(['A','C','G','T'], k=randint(18,30)))
-            if random_seq not in random_seqs and random_seq not in ad.var.index:
-                random_seqs.append(random_seq)
-
-        random_df = pd.DataFrame(index=random_seqs, data=['random']*len(random_seqs)\
-        , columns =['Labels'])
-
-        try:
-            augmented_df = populate_scs_with_bins(ad,precursor_df,mapping_dict,trained_on=config.trained_on)
-        except:
-            augmented_df = pd.DataFrame(columns=['Labels'])
-            print('Could not sample from precursors')
-
-        #augment fusion class:
-        fusion_df = augment_fusion(ad,fusion_label='fusion')
-
-        augmented_df = augmented_df.append(fusion_df).append(random_df)
-
-        ad.var['Labels'] = ad.var['Labels'].cat.add_categories({'random','fusion'})
-        #add all columns in ad.var to augmented_df with NaN values
-        ad = combine_var(ad,augmented_df)
-        if mc_or_sc == 'mc':
-            #convert ad.var.Labels to major class using mapping_dict and then to category
-            ad.var['Labels'] = ad.var['Labels'].map(mapping_dict).astype('category')
-
-
-    #AA seqs are sequences that have 5' adapter
-    aa_seqs = ad.var[ad.var['five_prime_adapter_filter'] == 0].index.tolist()
-    ad.var['Labels'] = ad.var['Labels'].cat.add_categories('artificial_affix')
-    ad.var.loc[aa_seqs,'Labels'] = 'artificial_affix'
-    ad.var['Labels'] = ad.var['Labels'].cat.remove_unused_categories()
-    ad.var['Sequences'] = ad.var.index.tolist()
-
-    if 'struct' in model_config.model_input:
-        ad.var['Secondary'] = fold_sequences(ad.var.index.tolist(),temperature=37)[f'structure_37'].values
-
-    return ad
 
 def prepare_inference_results_benchmarck(net,cfg,predicted_labels,logits,all_data):
     iterables = [["Sequences"], np.arange(1, dtype=int)]

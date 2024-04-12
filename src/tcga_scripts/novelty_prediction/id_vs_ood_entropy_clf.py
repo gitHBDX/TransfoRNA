@@ -14,6 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (auc, f1_score, precision_recall_curve,
                              roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
+
 from transforna.utils.file import save
 from transforna.utils.tcga_post_analysis_utils import Results_Handler
 
@@ -235,7 +236,9 @@ def compute_logits_clf_metrics(results):
 
 if __name__ == "__main__":
     #######################################TO CONFIGURE#############################################
-    path = f'models/tcga/TransfoRNA_FULL/sub_class/{sys.argv[1]}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
+    trained_on = sys.argv[1]
+    model = sys.argv[2]
+    path = f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','na']
     #run name
     run_name = None #if None, then the name of the model inputs will be used as the name

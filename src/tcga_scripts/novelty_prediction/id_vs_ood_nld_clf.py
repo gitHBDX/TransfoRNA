@@ -17,10 +17,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (auc, f1_score, precision_recall_curve,
                              roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
+
+from transforna.inference_api import predict_transforna
 from transforna.utils.file import load, save
 from transforna.utils.tcga_post_analysis_utils import Results_Handler
-from transforna.utils.utils import (get_closest_ngbr_per_split, get_fused_seqs)
-from transforna.inference_api import predict_transforna
+from transforna.utils.utils import get_closest_ngbr_per_split, get_fused_seqs
 
 
 def log_lev_params(threshold:float,analysis_path:str):
@@ -167,7 +168,9 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
 
 if __name__ == "__main__":
     #######################################TO CONFIGURE#############################################
-    path = f'models/tcga/TransfoRNA_FULL/sub_class/{sys.argv[1]}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
+    trained_on = sys.argv[1]
+    model = sys.argv[2]
+    path = f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','na']
     #run name
     run_name = None #if None, then the name of the model inputs will be used as the name
@@ -184,7 +187,7 @@ if __name__ == "__main__":
 
     fused_seqs = get_fused_seqs(results.splits_df_dict['train_df']['RNA Sequences'].values.flatten(),num_sequences=200)
 
-    fused_emb_df = predict_transforna(fused_seqs,model=f'{sys.argv[1]}',embedds_flag=True,trained_on='id')
+    fused_emb_df = predict_transforna(fused_seqs,model=f'{model}',embedds_flag=True,trained_on=trained_on)
     
     #rename fused_emb_df columns to results.embedds_cols
     fused_emb_df.columns = results.embedds_cols[:len(fused_emb_df.columns)]

@@ -15,13 +15,13 @@ from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 from yaml.loader import SafeLoader
 
+from .dataset.seq_tokenizer import SeqTokenizer
 from .utils.file import load
 from .utils.tcga_post_analysis_utils import Results_Handler
-from .utils.utils import get_closest_ngbr_per_split
-
-from .dataset.seq_tokenizer import SeqTokenizer
-from .utils.utils import (get_hp_setting, get_model, infer_from_pd,
-                          prepare_inference_results_tcga,update_config_with_inference_params)
+from .utils.utils import (get_closest_ngbr_per_split, get_hp_setting,
+                          get_model, infer_from_pd,
+                          prepare_inference_results_tcga,
+                          update_config_with_inference_params)
 
 warnings.filterwarnings("ignore")
 

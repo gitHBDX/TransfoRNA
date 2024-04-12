@@ -3,11 +3,12 @@ from typing import Dict
 from omegaconf import DictConfig
 
 from ..callbacks.metrics import accuracy_score
+from ..dataset.data_enriching import DataAugmenter
 from ..dataset.seq_tokenizer import SeqTokenizer
 from ..score.score import (compute_score_benchmark, compute_score_tcga,
                            infere_additional_test_data)
-from ..utils.utils import *
 from ..utils.file import load, save
+from ..utils.utils import *
 
 
 def compute_cv(cfg:DictConfig,path:str):
@@ -46,8 +47,8 @@ def train(cfg:Dict= None,path:str = None):
         #prepare data for training and inference
         all_data = prepare_data_benchmark(dataset_class,test_data,cfg)
     else: 
-        ad = append_model_input(ad,cfg)
-        dataset_class = SeqTokenizer(ad.var,cfg)
+        df = DataAugmenter(ad.var,cfg).get_augmented_df()
+        dataset_class = SeqTokenizer(df,cfg)
         all_data = prepare_data_tcga(dataset_class,cfg)
 
     #sync skorch config with params in train and model config

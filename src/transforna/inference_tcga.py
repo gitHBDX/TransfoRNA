@@ -1,9 +1,11 @@
 
+from pathlib import Path
 from typing import Dict
+
+from .dataset.seq_tokenizer import SeqTokenizer
 from .utils.file import load
 from .utils.utils import *
-from .dataset.seq_tokenizer import SeqTokenizer
-from pathlib import Path
+
 
 def infer_tcga(cfg:Dict= None,path:str = None):
     if cfg['tensorboard']:

@@ -1,12 +1,14 @@
 
+import math
+import warnings
+from random import randint
+
 import numpy as np
 import pandas as pd
-from ..utils import energy
-from random import randint
-import warnings
-from omegaconf import DictConfig
-import math
 from numpy.lib.stride_tricks import as_strided
+from omegaconf import DictConfig
+
+from ..utils import energy
 
 
 class SeqTokenizer:
