@@ -4,7 +4,8 @@ from typing import List
 from collections.abc import Callable
 
 def load_HBDxBase():
-    HBDxBase_file = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/mapping_reference/HBDxBase/HBDxBase.csv'
+    version = '_v4'
+    HBDxBase_file = f'../../references/HBDxBase/HBDxBase_all{version}.csv'
     HBDxBase_df = pd.read_csv(HBDxBase_file, index_col=0)
     HBDxBase_df.loc[:,'precursor_bins'] = (HBDxBase_df.precursor_length/25).astype(int)
     return HBDxBase_df

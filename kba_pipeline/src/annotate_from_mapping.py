@@ -25,15 +25,18 @@ pd.options.mode.chained_assignment = None
 # paths to reference and mapping files
 ######################################################################################################
 
-HBDxBase_csv = '../../references/HBDxBase/HBDxBase.csv'
+version = '_v4'
+
+HBDxBase_csv = f'../../references/HBDxBase/HBDxBase_all{version}.csv'
 miRBase_mature_path = '../../references/HBDxBase/miRBase/mature.fa'
-mat_miRNA_pos_path = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/mapping_reference/HBDxBase/miRBase/hsa_mature_position.txt'
+mat_miRNA_pos_path = '../../references/HBDxBase/miRBase/hsa_mature_position.txt'
 
 mapped_file = 'seqsmapped2HBDxBase_combined.txt'
-unmapped_file = 'tmp_seqs3mm2HBDxBase__unmapped.fa'
+unmapped_file = 'tmp_seqs3mm2HBDxBase_pseudo__unmapped.fa'
 TE_file = 'tmp_seqsmapped2genome_intersect_TE.txt'
 mapped_genome_file = 'seqsmapped2genome_combined.txt'
 toomanyloci_genome_file = 'tmp_seqs0mm2genome__toomanyalign.fa'
+unmapped_adapter_file = 'tmp_seqs3mm2adapters__unmapped.fa'
 unmapped_genome_file = 'tmp_seqs0mm2genome__unmapped.fa'
 unmapped_bacterial_file = 'tmp_seqs0mm2bacterial__unmapped.fa'
 unmapped_viral_file = 'tmp_seqs0mm2viral__unmapped.fa'
@@ -57,20 +60,19 @@ def extract_general_info(mapping_file):
 
     # add precursor length + number of bins that will be used for names
     HBDxBase_df = pd.read_csv(HBDxBase_csv, index_col=0)
-    HBDxBase_df = HBDxBase_df[['precursor_length','precursor_bins']].reset_index()
+    HBDxBase_df = HBDxBase_df[['precursor_length','precursor_bins','pseudo_class']].reset_index()
     HBDxBase_df.rename(columns={'index': "reference"}, inplace=True)
     mapping_df = mapping_df.merge(HBDxBase_df, left_on='reference', right_on='reference', how='left')
 
     # extract information
     mapping_df.loc[:,'mms'] = mapping_df.mm_descriptors.fillna('').str.count('>')
     mapping_df.loc[:,'mm_descriptors'] = mapping_df.mm_descriptors.str.replace(',', ';')
-    mapping_df.loc[:,'small_RNA_class_annotation'] = mapping_df.reference.str.split('|').str[0].str.replace('pseudo_','')
-    mapping_df.loc[:,'pseudo_class'] = mapping_df.reference.str.startswith('pseudo_')
+    mapping_df.loc[:,'small_RNA_class_annotation'] = mapping_df.reference.str.split('|').str[0]
     mapping_df.loc[:,'subclass_type'] = mapping_df.reference.str.split('|').str[2]
     mapping_df.loc[:,'precursor_name_full'] = mapping_df.reference.str.split('|').str[1].str.split('|').str[0]
     mapping_df.loc[:,'precursor_name'] = mapping_df.precursor_name_full.str.split('__').str[0].str.split('|').str[0]
     mapping_df.loc[:,'seq_length'] = mapping_df.sequence.apply(lambda x: len(x))
-    mapping_df.loc[:,'ref_end'] = mapping_df.ref_start +  mapping_df.seq_length
+    mapping_df.loc[:,'ref_end'] = mapping_df.ref_start +  mapping_df.seq_length - 1
     mapping_df.loc[:,'mitochondrial'] = np.where(mapping_df.reference.str.contains(r'(\|MT-)|(12S)|(16S)'), 'mito', 'nuclear')
 
     # get non-templated 3' polyA and polyT tails
@@ -110,14 +112,22 @@ def tRNA_annotation(mapping_df):
     tRF_trailer_df.loc[:,'subclass_type'] = np.where(tRF_trailer_df.ref_start.between(0, 5, inclusive='both'), 'trailer_tRF', 'misc-trailer-tRF')
 
     # define tRF subclasses (leader_tRF and trailer_tRF have been assigned previously)
+    # NOTE: allow more flexibility at ends (similar to miRNA annotation)
     tRNAs_df = mapping_df[((mapping_df['small_RNA_class_annotation'] == 'tRNA') & mapping_df['subclass_type'].isna())]
-    tRNAs_df.loc[((tRNAs_df.ref_start == 0) & (tRNAs_df.seq_length >= 30)),'subclass_type'] = '5p-tR-half'
-    tRNAs_df.loc[((tRNAs_df.ref_start == 0) & (tRNAs_df.seq_length < 30)),'subclass_type'] = '5p-tRF'
-    tRNAs_df.loc[((((tRNAs_df.ref_end + 1) == tRNAs_df.precursor_length) & (tRNAs_df.seq_length >= 30)) | (((tRNAs_df.ref_end + 1) == (tRNAs_df.precursor_length - 3)) & (tRNAs_df.seq_length >= 30))),'subclass_type'] = '3p-tR-half'
-    tRNAs_df.loc[(((tRNAs_df.ref_end + 1) == (tRNAs_df.precursor_length - 3)) & (tRNAs_df.seq_length < 30)),'subclass_type'] = '3p-tRF'
-    tRNAs_df.loc[(((tRNAs_df.ref_end + 1) == tRNAs_df.precursor_length) & (tRNAs_df.seq_length < 30)),'subclass_type'] = '3p-CCA-tRF'
+    tRNAs_df.loc[((tRNAs_df.ref_start < 3) & (tRNAs_df.seq_length >= 30)),'subclass_type'] = '5p-tR-half'
+    tRNAs_df.loc[((tRNAs_df.ref_start < 3) & (tRNAs_df.seq_length < 30)),'subclass_type'] = '5p-tRF'
+    tRNAs_df.loc[(((tRNAs_df.precursor_length - (tRNAs_df.ref_end + 1)) < 6) & (tRNAs_df.seq_length >= 30)),'subclass_type'] = '3p-tR-half'
+    tRNAs_df.loc[(((tRNAs_df.precursor_length - (tRNAs_df.ref_end + 1)).between(3,6,inclusive='neither')) & (tRNAs_df.seq_length < 30)),'subclass_type'] = '3p-tRF'
+    tRNAs_df.loc[(((tRNAs_df.precursor_length - (tRNAs_df.ref_end + 1)) < 3) & (tRNAs_df.seq_length < 30)),'subclass_type'] = '3p-CCA-tRF' 
     tRNAs_df.loc[tRNAs_df.subclass_type.isna(),'subclass_type'] = 'misc-tRF'
-
+    # add ref_iso flag
+    tRNAs_df['tRNA_ref_iso'] = np.where(
+        (
+            (tRNAs_df.ref_start == 0) 
+            | ((tRNAs_df.ref_end + 1) == tRNAs_df.precursor_length) 
+            | ((tRNAs_df.ref_end + 1) == (tRNAs_df.precursor_length - 3))
+        ), 'reftRF', 'isotRF'
+    )
     # concat tRNA, leader & trailer dfs
     tRNAs_df = pd.concat([tRNAs_df, tRF_leader_df, tRF_trailer_df],axis=0)
     # adjust precursor name and create tRNA name
@@ -248,7 +258,7 @@ def aggregate_info_per_seq(sRNA_anno_df):
     aggreg_per_seq_df['mms'] = aggreg_per_seq_df['mms'].astype(int)
 
     # re-add 'miRNA_ref_iso'
-    refmir_df = sRNA_anno_df[['sequence','miRNA_ref_iso']]
+    refmir_df = sRNA_anno_df[['sequence','miRNA_ref_iso','tRNA_ref_iso']]
     refmir_df.drop_duplicates('sequence', inplace=True)
     refmir_df.set_index('sequence', inplace=True)
     aggreg_per_seq_df = aggreg_per_seq_df.merge(refmir_df, left_index=True, right_index=True, how='left')
@@ -262,6 +272,7 @@ def aggregate_info_per_seq(sRNA_anno_df):
         unmapped_df = pd.DataFrame(data='no_annotation', index=unmapped_df.sequence, columns=aggreg_per_seq_df.columns)
         unmapped_df['mms'] = np.nan
         unmapped_df['reference'] = np.nan
+        unmapped_df['pseudo_class'] = True # set no annotation as pseudo_class
 
         # merge mapped and unmapped
         annotation_df = pd.concat([aggreg_per_seq_df,unmapped_df])
@@ -367,6 +378,10 @@ def add_hico_annotation(annotation_df, five_prime_adapter):
     viral_unmapped_df = fasta2df(unmapped_viral_file)
     annotation_df.loc[:,'viral'] = np.where(annotation_df.sequence.isin(viral_unmapped_df.sequence), False, True)
 
+    # add 'adapter_mapping_filter' column 
+    adapter_unmapped_df = fasta2df(unmapped_adapter_file)
+    annotation_df.loc[:,'adapter_mapping_filter'] = np.where(annotation_df.sequence.isin(adapter_unmapped_df.sequence), True, False)
+
     # add filter column 'five_prime_adapter_filter' and column 'five_prime_adapter_length' indicating the length of the prefixed 5' adapter sequence
     adapter_df = get_five_prime_adapter_info(annotation_df, five_prime_adapter)
     annotation_df = annotation_df.merge(adapter_df, left_on='sequence', right_on='sequence', how='left')
@@ -391,6 +406,7 @@ def add_hico_annotation(annotation_df, five_prime_adapter):
         & (annotation_df.TE_annotation.isna() == True)
         & (annotation_df.bacterial == False)
         & (annotation_df.viral == False)
+        & (annotation_df.adapter_mapping_filter == True)
         & (annotation_df.five_prime_adapter_filter == True)
     ), True, False)
     ## NOTE: for miRNAs only use hico annotation if part of refmiR set
@@ -424,6 +440,7 @@ def main(five_prime_adapter):
     - unmapped_genome_file
 
     - TE_file
+    - unmapped_adapter_file
     - unmapped_bacterial_file
     - unmapped_viral_file
     - five_prime_adapter

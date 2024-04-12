@@ -148,7 +148,7 @@ def build_bowtie_index(bowtie_index_file):
 
 
 def make_output_dir(fasta_file):
-    output_dir = default_path + datetime.now().strftime('%Y-%m-%d') + ('__') + fasta_file.replace('.fasta', '').replace('.fa', '')
+    output_dir = default_path + datetime.now().strftime('%Y-%m-%d') + ('__') + fasta_file.replace('.fasta', '').replace('.fa', '') + '/'
     try:
         os.makedirs(output_dir)
     except OSError as e:
