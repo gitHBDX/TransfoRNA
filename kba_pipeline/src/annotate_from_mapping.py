@@ -32,7 +32,7 @@ miRBase_mature_path = '../../references/HBDxBase/miRBase/mature.fa'
 mat_miRNA_pos_path = '../../references/HBDxBase/miRBase/hsa_mature_position.txt'
 
 mapped_file = 'seqsmapped2HBDxBase_combined.txt'
-unmapped_file = 'tmp_seqs3mm2HBDxBase__unmapped.fa'
+unmapped_file = 'tmp_seqs3mm2HBDxBase_pseudo__unmapped.fa'
 TE_file = 'tmp_seqsmapped2genome_intersect_TE.txt'
 mapped_genome_file = 'seqsmapped2genome_combined.txt'
 toomanyloci_genome_file = 'tmp_seqs0mm2genome__toomanyalign.fa'
@@ -67,7 +67,7 @@ def extract_general_info(mapping_file):
     # extract information
     mapping_df.loc[:,'mms'] = mapping_df.mm_descriptors.fillna('').str.count('>')
     mapping_df.loc[:,'mm_descriptors'] = mapping_df.mm_descriptors.str.replace(',', ';')
-    mapping_df.loc[:,'small_RNA_class_annotation'] = mapping_df.reference.str.split('|').str[0].str.replace('pseudo_','')
+    mapping_df.loc[:,'small_RNA_class_annotation'] = mapping_df.reference.str.split('|').str[0]
     mapping_df.loc[:,'subclass_type'] = mapping_df.reference.str.split('|').str[2]
     mapping_df.loc[:,'precursor_name_full'] = mapping_df.reference.str.split('|').str[1].str.split('|').str[0]
     mapping_df.loc[:,'precursor_name'] = mapping_df.precursor_name_full.str.split('__').str[0].str.split('|').str[0]
@@ -272,6 +272,7 @@ def aggregate_info_per_seq(sRNA_anno_df):
         unmapped_df = pd.DataFrame(data='no_annotation', index=unmapped_df.sequence, columns=aggreg_per_seq_df.columns)
         unmapped_df['mms'] = np.nan
         unmapped_df['reference'] = np.nan
+        unmapped_df['pseudo_class'] = True # set no annotation as pseudo_class
 
         # merge mapped and unmapped
         annotation_df = pd.concat([aggreg_per_seq_df,unmapped_df])
