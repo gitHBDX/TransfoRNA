@@ -188,17 +188,19 @@ class Results_Handler():
 
     def get_specific_hp_param(self,hp_param):
         hp_settings = load(path=self.meta_path+'/hp_settings')
-        try:
-            hp_val = hp_settings['model_config'][hp_param]
-        except:
-            try:
-                hp_val = hp_settings['train_config'][hp_param]
-            except:
+        #hp_param could be in hp_settings .keyes or in a key of a key
+        hp_val = hp_settings.get(hp_param)
+        if not hp_val:
+            for key in hp_settings.keys():
                 try:
-                    hp_val = hp_settings['main_config'][hp_param]
+                    hp_val = hp_settings[key].get(hp_param)
                 except:
-                    print(f"{hp_param} not found in hp_settings")
-                    hp_val = None
+                    pass
+                if hp_val:
+                    break
+        if not hp_val:
+            raise ValueError(f"hp_param {hp_param} not found in hp_settings")
+
         return hp_val
 
     def load_mc_mapping_dict(self,mapping_dict_path:str=None):
