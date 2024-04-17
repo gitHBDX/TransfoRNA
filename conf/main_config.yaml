@@ -4,9 +4,16 @@ defaults:
   
 task: tcga # tcga,sncrna or premirna or custom (for a custom dataset)
 
+
+train_config:
+  _target_: train_model_configs.${task}.GeneEmbeddTrainConfig
+
+model_config:
+  _target_: train_model_configs.${task}.GeneEmbeddModelConfig
+
 #train settings
 model_name: seq #seq, seq-seq, seq-struct, seq-reverse, seq-exp or baseline
-trained_on: id #full or id
+trained_on: full #full or id
 inference: False   # True or False
 #if inference is true, should the logits be logged?
 log_logits: False
@@ -33,3 +40,6 @@ tensorboard: False  # True or False
 #  output_subdir: null  
 #  run:  
 #    dir: .
+
+
+

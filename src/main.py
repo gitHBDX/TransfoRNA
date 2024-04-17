@@ -9,32 +9,28 @@ from omegaconf import DictConfig, OmegaConf
 from transforna.inference_benchmark import infer_benchmark
 from transforna.inference_tcga import infer_tcga
 from transforna.train.train import compute_cv, train
-
+from hydra.core.hydra_config import HydraConfig
+import sys
 warnings.filterwarnings("ignore")
 
-@hydra.main(config_path="./configs",config_name="main_config")
+def add_config_to_sys_path():
+    cfg = HydraConfig.get()
+    config_path = [path["path"] for path in cfg.runtime.config_sources if path["schema"] == "file"][0]
+    sys.path.append(config_path)
+
+
+@hydra.main(config_path='../conf', config_name="main_config")
 def my_app(cfg: DictConfig) -> None:
+    add_config_to_sys_path()
+
     path = os.getcwd()
-
-    #validate that config is configured properly
-    #assert_config(cfg)
-
     #init train and model config
-    train_cfg_path = {"_target_": "configs.train_model_configs.%s.GeneEmbeddTrainConfig"%cfg["task"]}
-    model_cfg_path = {"_target_": "configs.train_model_configs.%s.GeneEmbeddModelConfig"%cfg["task"]}
-    train_config = instantiate(train_cfg_path)
-    model_config = instantiate(model_cfg_path)
-
-    #prepare configs as structured dicts
-    train_config = OmegaConf.structured(asdict(train_config))
-    model_config = OmegaConf.structured(asdict(model_config))
+    cfg['train_config'] = instantiate(cfg['train_config']).__dict__
+    cfg['model_config'] = instantiate(cfg['model_config']).__dict__
 
     #update model config with the name of the model 
-    model_config["model_input"] = cfg["model_name"]
+    cfg['model_config']["model_input"] = cfg["model_name"]
 
-
-    #append train and model config to the main config
-    cfg = OmegaConf.merge({"train_config":train_config,"model_config":model_config}, cfg)
     #inference or train
     if cfg["inference"]:
         if cfg['task'] == 'tcga':
