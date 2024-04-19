@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict
 
 from .callbacks.metrics import accuracy_score
-from .dataset.seq_tokenizer import SeqTokenizer
+from .processing.seq_tokenizer import SeqTokenizer
 from .score.score import infer_from_model, infer_testset
 from .utils.file import load, save
 from .utils.utils import *

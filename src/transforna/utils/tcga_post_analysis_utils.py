@@ -14,7 +14,7 @@ from .file import create_dirs, load
 class Results_Handler():
     def __init__(self,path:str,splits:List,mc_flag:bool=False,read_ad:bool=False,run_name:str=None,save_results:bool=False) -> None:
         self.save_results = save_results
-        self.all_splits = ['train','valid','test','ood','na']
+        self.all_splits = ['train','valid','test','ood','artificial','no_annotation']
         if splits == ['all']:
             self.splits = self.all_splits
         else:
@@ -37,7 +37,8 @@ class Results_Handler():
         create_dirs([self.figures_path,self.analysis_path,self.post_models_path])
 
         #get half of embedds cols if the model is Seq
-        if '/Seq/' in path:
+        model_name = self.get_specific_hp_param(hp_param="model_name")
+        if model_name == 'seq':
             self.embedds_cols = self.embedds_cols[:len(self.embedds_cols)//2]
 
         if not run_name:
@@ -48,13 +49,12 @@ class Results_Handler():
         ad_path = self.get_specific_hp_param(hp_param="dataset_path_train")
         if read_ad:
             self.ad = load(ad_path)
+        
 
-        #if self.splits_df_dict['ood_df']['Labels'].value_counts().shape[0] > 1:
-        if 'ood' in self.splits:
-            self.seperate_label_from_ood() #ID: ood will contain OOD. FULL: ood will contain random
+        self.seperate_label_from_split(split='artificial',removed_label='artificial_affix')
+        self.seperate_label_from_split(split='artificial',removed_label='random')
+        self.seperate_label_from_split(split='artificial',removed_label='recombined')
 
-        #path for a dict mapping from sub_class to major class
-        self.mapping_dict_path = self.get_specific_hp_param(hp_param="mapping_dict_path")
         self.sc_to_mc_mapper_dict = self.load_mc_mapping_dict()
 
         #get whether curr results are trained on ID or FULL
@@ -65,13 +65,7 @@ class Results_Handler():
 
 
         #read train to be used for knn training and inference
-        if 'train' not in self.splits:
-            #get_data train
-            _,df_dict = self.get_data(path,['train'])
-            train_df = df_dict['train_df']
-            #train seqs
-        else:
-            train_df = self.splits_df_dict['train_df']
+        train_df = self.splits_df_dict['train_df']
         
         self.knn_seqs = train_df[self.seq_col].values
         self.knn_labels = train_df[self.label_col].values
@@ -98,19 +92,25 @@ class Results_Handler():
         self.knn_model = pickle.load(open(filename,'rb'))
         return
 
-    def seperate_label_from_ood(self,removed_label:str='artificial_affix'):
-        #get art affx
-        removed_label_df = self.splits_df_dict["ood_df"].loc[self.splits_df_dict["ood_df"][self.label_col]['0'] == removed_label]
+    def seperate_label_from_split(self,split,removed_label:str='artificial_affix'):
+        
+        if split in self.splits:
+            print(f"splitting {removed_label} from split: {split}")
 
-        #append art affx as key
-        self.splits_df_dict[f'{removed_label}_df'] = removed_label_df
-        #remove art affx from ood
-        art_affx_ids = self.splits_df_dict["ood_df"].index.isin(removed_label_df.index)
-        self.splits_df_dict["ood_df"] = self.splits_df_dict["ood_df"][~art_affx_ids].reset_index(drop=True)
 
-        #reset artificial_affix_idx
-        self.splits_df_dict[f'{removed_label}_df'] = self.splits_df_dict[f'{removed_label}_df'].reset_index(drop=True)
-        self.all_splits.append(f'{removed_label}')
+            #get art affx
+            removed_label_df = self.splits_df_dict[f"{split}_df"].loc[self.splits_df_dict[f"{split}_df"][self.label_col]['0'] == removed_label]
+
+            #append art affx as key
+            self.splits_df_dict[f'{removed_label}_df'] = removed_label_df
+            #remove art affx from ood
+            removed_label_ids = self.splits_df_dict[f"{split}_df"].index.isin(removed_label_df.index)
+            self.splits_df_dict[f"{split}_df"] = self.splits_df_dict[f"{split}_df"][~removed_label_ids].reset_index(drop=True)
+
+            #resetf {split}_affix_idx
+            self.splits_df_dict[f'{removed_label}_df'] = self.splits_df_dict[f'{removed_label}_df'].reset_index(drop=True)
+            self.all_splits.append(f'{removed_label}')
+
 
     def append_loco_variants(self):
         train_classes = self.splits_df_dict["train_df"]["Logits"].columns.values
@@ -148,18 +148,19 @@ class Results_Handler():
         nanas_df = nans_and_loco_train_df[nans_mask.values.sum(axis=1) == len(nans_mask.columns)]
         loco_in_train_df = nans_and_loco_train_df[nans_mask.values.sum(axis=1) < len(nans_mask.columns)]
 
-        self.splits_df_dict["loco_not_in_train_df"] = self.splits_df_dict["na_df"][self.splits_df_dict["na_df"][self.seq_col]['0'].isin(loco_not_in_train_df.index)]
-        self.splits_df_dict["loco_mixed_df"] = self.splits_df_dict["na_df"][self.splits_df_dict["na_df"][self.seq_col]['0'].isin(loco_mixed_df.index)]
-        self.splits_df_dict["loco_in_train_df"] = self.splits_df_dict["na_df"][self.splits_df_dict["na_df"][self.seq_col]['0'].isin(loco_in_train_df.index)]
-        self.splits_df_dict["na_df"] = self.splits_df_dict["na_df"][self.splits_df_dict["na_df"][self.seq_col]['0'].isin(nanas_df.index)]
-        
+        self.splits_df_dict["loco_not_in_train_df"] = self.splits_df_dict["no_annotation_df"][self.splits_df_dict["no_annotation_df"][self.seq_col]['0'].isin(loco_not_in_train_df.index)]
+        self.splits_df_dict["loco_mixed_df"] = self.splits_df_dict["no_annotation_df"][self.splits_df_dict["no_annotation_df"][self.seq_col]['0'].isin(loco_mixed_df.index)]
+        self.splits_df_dict["loco_in_train_df"] = self.splits_df_dict["no_annotation_df"][self.splits_df_dict["no_annotation_df"][self.seq_col]['0'].isin(loco_in_train_df.index)]
+        self.splits_df_dict["no_annotation_df"] = self.splits_df_dict["no_annotation_df"][self.splits_df_dict["no_annotation_df"][self.seq_col]['0'].isin(nanas_df.index)]
+    
     def get_data(self,path:str,splits:List,ith_run:int = -1):
         #results exist in the outputs folder.
         #outputs folder has two depth levels, first level indicates day and second indicates time per day
         #if path not given, get results from last run
         #ith run specifies the last run (-1), second last(-2)... etc 
         if not path:
-            files = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../..', 'outputs'))
+            files = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'outputs'))
+            print(files)
             #newest
             paths = sorted(list(Path(files).rglob('')), key=lambda x: Path.stat(x).st_mtime, reverse=True)
             ith_run = abs(ith_run)
@@ -171,15 +172,25 @@ class Results_Handler():
                         break
 
         split_dfs = {}
+        splits_to_remove = []
         for split in splits:
-            #read logits csv
-            split_df = load(
-                path+f'/{split}_embedds.tsv',
-                header=[0, 1],
-                index_col=0,
-            )
-            split_df['split','0'] = split
-            split_dfs[f"{split}_df"] = split_df
+            try:
+                #read logits csv
+                split_df = load(
+                    path+f'/{split}_embedds.tsv',
+                    header=[0, 1],
+                    index_col=0,
+                )
+                split_df['split','0'] = split
+                split_dfs[f"{split}_df"] = split_df
+
+            except:
+                splits_to_remove.append(split)
+                print(f'{split} does not exist in embedds! Removing it from splits')
+        
+        for split in splits_to_remove:
+            self.splits.remove(split)
+
 
         #remove trailing / from path
         if path[-1] == '/':
@@ -203,9 +214,8 @@ class Results_Handler():
 
         return hp_val
 
-    def load_mc_mapping_dict(self,mapping_dict_path:str=None):
-        if not mapping_dict_path:
-            mapping_dict_path = self.mapping_dict_path
+    def load_mc_mapping_dict(self):
+        mapping_dict_path = self.get_specific_hp_param(hp_param="mapping_dict_path")
 
         return load(mapping_dict_path)
 

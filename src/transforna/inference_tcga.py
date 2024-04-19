@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Dict
 
-from .dataset.seq_tokenizer import SeqTokenizer
+from .processing.seq_tokenizer import SeqTokenizer
 from .utils.file import load
 from .utils.utils import *
 

@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 from yaml.loader import SafeLoader
 
-from .dataset.seq_tokenizer import SeqTokenizer
+from .processing.seq_tokenizer import SeqTokenizer
 from .utils.file import load
 from .utils.tcga_post_analysis_utils import Results_Handler
 from .utils.utils import (get_closest_ngbr_per_split, get_hp_setting,

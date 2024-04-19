@@ -2,10 +2,9 @@
 import math
 import os
 import random
-from contextlib import redirect_stdout
 from pathlib import Path
 from random import randint
-from typing import Dict, List, Tuple
+from typing import  List
 
 import anndata
 import numpy as np
@@ -25,7 +24,6 @@ from skorch.dataset import Dataset
 from skorch.helper import predefined_split
 
 from ..callbacks.metrics import get_callbacks
-from ..dataset.seq_tokenizer import SeqTokenizer
 from ..score.score import infer_from_model
 from ..utils.file import save
 from ..utils.tcga_post_analysis_utils import Results_Handler
@@ -148,38 +146,6 @@ def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sc',trai
     model_config["model_input"] = inference_config["model_name"]
     inference_config = OmegaConf.merge({"train_config": train_config, "model_config": model_config}, inference_config)
     return inference_config
-
-def predict_transforna_na(config:DictConfig = None) -> Tuple:
-    inference_config = update_config_with_inference_params(config)
-    
-    #path should be infer_cfg["model_path"] - 2 level + embedds
-    path = '/'.join(inference_config['inference_settings']["model_path"].split('/')[:-2])+'/embedds'
-    #read threshold
-    results:Results_Handler = Results_Handler(path=path,splits=['train','na'])
-    results.get_knn_model()
-    threshold = load(results.analysis_path+"/novelty_model_coef")["Threshold"]
-    sequences = results.splits_df_dict['na_df'][results.seq_col].values[:,0]
-    with redirect_stdout(None):
-        root_dir = Path(__file__).parents[3].absolute()
-        inference_config, net = get_model(inference_config, root_dir)
-        infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-        print(f'predicting sub classes for the NA set by the ID models')
-        predicted_labels, logits,gene_embedds_df, attn_scores_pd,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, SeqTokenizer)
-
-
-    prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
-    infer_pd = all_data["infere_rna_seq"]
-
-    
-    #compute lev distance for embedds and 
-    print('computing levenstein distance for the NA set by the ID models')
-    _,_,_,_,_,lev_dist = get_closest_ngbr_per_split(results,'na')
-    
-    print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
-    infer_pd['Is Familiar?'] = [True if lv<threshold else False for lv in lev_dist]
-    infer_pd['Threshold'] = threshold
-    print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
-    return infer_pd.rename_axis("Sequence").reset_index()
     
 def set_seed_and_device(seed:int = 0,device_no:int=0):
     # set seed
@@ -247,19 +213,6 @@ def instantiate_predictor(skorch_cfg: DictConfig,cfg:DictConfig,path: str=None):
     net.initialized_=True
     return net
 
-def revert_seq_tokenization(sequences,configs):
-    window = configs["model_config"].window
-    if configs["model_config"].tokenizer != "overlap":
-        print("Sequences are not reverse tokenized")
-        return sequences
-    
-    #currently only overlap tokenizer can be reverted
-    seqs_concat = []
-    for seq in sequences.values:
-        seqs_concat.append(''.join(seq[seq!='pad'])[::window]+seq[seq!='pad'][-1][window-1])
-    
-    return pd.DataFrame(seqs_concat,columns=["Sequences"])
-
 def prepare_split(split_data_df,configs):
     '''
     This function returns tokens, token ids and labels for a given dataframes' split.
@@ -308,7 +261,7 @@ def get_add_test_set(dataset_class,dataset_path):
 
         dataset_class.seqs_dot_bracket_labels = test_pd
         dataset_class.limit_seqs_to_range()
-        all_added_test_set.append(dataset_class.get_preprocessed_data_df())
+        all_added_test_set.append(dataset_class.get_tokenized_data())
     return all_added_test_set
 
 def update_config_with_dataset_params_benchmark(train_data_df,configs):
@@ -333,7 +286,7 @@ def tokenize_set(dataset_class,test_ad,inference:bool=False):
     #prevent sequences with len < min lenght from being deleted
     dataset_class.min_length = 0
     dataset_class.limit_seqs_to_range()
-    return  dataset_class.get_preprocessed_data_df(inference)
+    return  dataset_class.get_tokenized_data(inference)
 
 def stratify(train_data,train_labels,valid_size):
     return train_test_split(train_data, train_labels,
@@ -346,9 +299,8 @@ def convert_to_tensor(in_arr,convert_type,device):
         np.array(in_arr, dtype=convert_type),
         dtype=tensor_dtype,
     ).to(device=device)
-
         
-def prepare_data_benchmark(dataset_class,test_ad, configs):
+def prepare_data_benchmark(tokenizer,test_ad, configs):
     """
     This function recieves anddata and prepares the anndata in a format suitable for training
     It also set default parameters in the config that cannot be known until preprocessing step
@@ -356,13 +308,13 @@ def prepare_data_benchmark(dataset_class,test_ad, configs):
     all_data_df is heirarchical pandas dataframe, so can be accessed  [AA,AT,..,AC ]
     """
     ###get tokenized train set
-    train_data_df = dataset_class.get_preprocessed_data_df()
+    train_data_df = tokenizer.get_tokenized_data()
     
     ### update config with data specific params
     update_config_with_dataset_params_benchmark(train_data_df,configs)
 
     ###tokenize test set
-    test_data_df = tokenize_set(dataset_class,test_ad)
+    test_data_df = tokenize_set(tokenizer,test_ad)
 
     ### get tokens(on device), seqs and labels(on device)
     train_data, train_rna_seq, train_labels =  prepare_split(train_data_df,configs)
@@ -392,14 +344,14 @@ def prepare_data_benchmark(dataset_class,test_ad, configs):
                "test_labels_numeric":test_labels}
 
     if configs["task"] == "premirna":
-        generalization_test_set = get_add_test_set(dataset_class,\
+        generalization_test_set = get_add_test_set(tokenizer,\
             dataset_path=configs["train_config"].datset_path_additional_testset)
     
 
     #get all vocab from both test and train set
-    configs["model_config"].vocab_size = len(dataset_class.seq_tokens_ids_dict.keys())
-    configs["model_config"].second_input_vocab_size = len(dataset_class.second_input_tokens_ids_dict.keys())
-    configs["model_config"].tokens_mapping_dict = dataset_class.seq_tokens_ids_dict
+    configs["model_config"].vocab_size = len(tokenizer.seq_tokens_ids_dict.keys())
+    configs["model_config"].second_input_vocab_size = len(tokenizer.second_input_tokens_ids_dict.keys())
+    configs["model_config"].tokens_mapping_dict = tokenizer.seq_tokens_ids_dict
 
     
     if configs["task"] == "premirna":
@@ -412,7 +364,7 @@ def prepare_data_benchmark(dataset_class,test_ad, configs):
 
     #get inference dataset
     # if do inference and inference datasert path exists
-    get_inference_data(configs,dataset_class,all_data)
+    get_inference_data(configs,tokenizer,all_data)
 
     return all_data
 
@@ -442,117 +394,11 @@ def get_inference_data(configs,dataset_class,all_data):
 
         dataset_class.min_length = 0
         dataset_class.limit_seqs_to_range()
-        infere_data_df = dataset_class.get_preprocessed_data_df(inference=True)
+        infere_data_df = dataset_class.get_tokenized_data(inference=True)
         infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,configs)
 
         all_data["infere_data"] = infere_data
         all_data["infere_rna_seq"] = infere_rna_seq
-
-def remove_fewer_samples(min_num_samples,selected_classes_df):
-    counts = selected_classes_df['Labels'].value_counts()
-    fewer_class_ids = counts[counts < min_num_samples].index
-    fewer_class_labels = [i[0]  for i in fewer_class_ids]
-    fewer_samples_per_class_df = selected_classes_df.loc[selected_classes_df['Labels'].isin(fewer_class_labels).values, :]
-    fewer_ids = selected_classes_df.index.isin(fewer_samples_per_class_df.index)
-    selected_classes_df = selected_classes_df[~fewer_ids]
-    return fewer_samples_per_class_df,selected_classes_df
-
-
-def split_tcga_data_keep_all_sc(selected_classes_df,configs):
-    #remove artificial_affix
-    ood_df = selected_classes_df.loc[selected_classes_df['Labels'][0].isin(['random','recombined','artificial_affix'])]
-    art_affix_ids = selected_classes_df.index.isin(ood_df.index)
-    selected_classes_df = selected_classes_df[~art_affix_ids]
-    selected_classes_df = selected_classes_df.reset_index(drop=True)
-
-    #remove no annotations
-    no_annotaton_df = selected_classes_df.loc[selected_classes_df['Labels'].isnull().values]
-
-    n_a_ids = selected_classes_df.index.isin(no_annotaton_df.index)
-    selected_classes_df = selected_classes_df[~n_a_ids]
-    #reset ids
-    selected_classes_df = selected_classes_df.reset_index(drop=True)
-    no_annotaton_df = no_annotaton_df.reset_index(drop=True)
-    #get quantity of each class and append it as a column
-    selected_classes_df["Quantity",'0'] = selected_classes_df["Labels"].groupby([0])[0].transform("count")
-    frequent_samples_df = selected_classes_df[selected_classes_df["Quantity",'0'] >= 8].reset_index(drop=True)
-    fewer_samples_df = selected_classes_df[selected_classes_df["Quantity",'0'] < 8].reset_index(drop=True)
-    unique_fewer_samples_df = fewer_samples_df.drop_duplicates(subset=[('Labels',0)], keep="last")
-    unique_fewer_samples_df['Quantity','0'] -= 8
-    unique_fewer_samples_df['Quantity','0'] = unique_fewer_samples_df['Quantity','0'].abs()
-    repeated_fewer_samples_df = unique_fewer_samples_df.loc[unique_fewer_samples_df.index.repeat(unique_fewer_samples_df.Quantity['0'])]
-    repeated_fewer_samples_df = repeated_fewer_samples_df.reset_index(drop=True)
-    selected_classes_df = frequent_samples_df.append(repeated_fewer_samples_df).append(fewer_samples_df).reset_index(drop=True)
-
-    
-    train_df,valid_test_df = train_test_split(selected_classes_df,stratify=selected_classes_df["Labels"],train_size=0.7,random_state=configs.seed)
-    
-    valid_df,test_df =train_test_split(valid_test_df,stratify=valid_test_df["Labels"],train_size=0.5,random_state=configs.seed)
-    
-    train_labels = train_df['Labels'].values.tolist()
-    train_labels = [i[0] for i in train_labels]
-    valid_labels = valid_df['Labels'].values.tolist()
-    valid_labels = [i[0] for i in valid_labels]
-
-    ood_3_labels = list(set(train_labels).difference(set(valid_labels)))
-    ood_3_df = train_df[train_df['Labels'][0].isin(ood_3_labels)]
-    ood_3_ids = train_df.index.isin(ood_3_df.index)
-    train_df = train_df[~ood_3_ids]
-
-
-
-    #train_df is the selected_classes_df in case of full as no train/val/test split should take place
-    #sample 1 sample per each label in valid_df and test_df
-    valid_df = valid_df.groupby(('Labels',0)).apply(lambda x: x.iloc[np.random.randint(x.shape[0]),:] if len(x)>0 else None).reset_index(drop=True).dropna(subset=[('Labels',0)])
-    test_df = test_df.groupby(('Labels',0)).apply(lambda x: x.iloc[np.random.randint(x.shape[0]),:] if len(x)>0 else None).reset_index(drop=True).dropna(subset=[('Labels',0)])
-    splits_df_dict = {"train_df":selected_classes_df,"valid_df":valid_df,"test_df":test_df,"ood_df":ood_df,"no_annotaiton_df":no_annotaton_df}
-    return splits_df_dict
-
-def split_tcga_data(selected_classes_df,configs):
-    #remove artificial_affix
-    ood_0_df = selected_classes_df.loc[selected_classes_df['Labels'][0] == 'artificial_affix']
-    art_affix_ids = selected_classes_df.index.isin(ood_0_df.index)
-    selected_classes_df = selected_classes_df[~art_affix_ids]
-    selected_classes_df = selected_classes_df.reset_index(drop=True)
-
-    #remove no annotations
-    no_annotaton_df = selected_classes_df.loc[selected_classes_df['Labels'].isnull().values]
-
-    n_a_ids = selected_classes_df.index.isin(no_annotaton_df.index)
-    selected_classes_df = selected_classes_df[~n_a_ids]
-    #reset ids
-    selected_classes_df = selected_classes_df.reset_index(drop=True)
-    no_annotaton_df = no_annotaton_df.reset_index(drop=True)
-    #remove classes that have only one sample
-    min_num_samples = 2
-    ood_1_df,selected_classes_df = remove_fewer_samples(min_num_samples,selected_classes_df)
-    #reset index
-    selected_classes_df = selected_classes_df.reset_index(drop=True)
-    
-    #split data
-    train_df,valid_test_df = train_test_split(selected_classes_df,stratify=selected_classes_df["Labels"],train_size=0.8,random_state=configs.seed)
-    
-    #remove ones from valid test df
-    min_num_samples = 2
-    ood_2_df,valid_test_df = remove_fewer_samples(min_num_samples,valid_test_df)
-    valid_df,test_df =train_test_split(valid_test_df,stratify=valid_test_df["Labels"],train_size=0.5,random_state=configs.seed)
-    
-    train_labels = train_df['Labels'].values.tolist()
-    train_labels = [i[0] for i in train_labels]
-    valid_labels = valid_df['Labels'].values.tolist()
-    valid_labels = [i[0] for i in valid_labels]
-
-    ood_3_labels = list(set(train_labels).difference(set(valid_labels)))
-    ood_3_df = train_df[train_df['Labels'][0].isin(ood_3_labels)]
-    ood_3_ids = train_df.index.isin(ood_3_df.index)
-    train_df = train_df[~ood_3_ids]
-    #create ood set but selecting classes in train but not in valid or test
-    # PLUS appending the oo_1_df
-    ood_df = ood_0_df.append(ood_1_df).append(ood_2_df).append(ood_3_df)
-
-
-    splits_df_dict = {"train_df":train_df,"valid_df":valid_df,"test_df":test_df,"ood_df":ood_df,"no_annotaiton_df":no_annotaton_df}
-    return splits_df_dict
 
 def update_config_with_dataset_params_tcga(dataset_class,all_data_df,configs):
     configs["model_config"].ff_input_dim = all_data_df['second_input'].shape[1]
@@ -574,205 +420,12 @@ def update_config_with_dataset_params_tcga(dataset_class,all_data_df,configs):
     if configs["model_name"] == "seq-exp":
         configs["model_config"]["num_embed_hidden"] = 30 
 
-def append_sample_weights(splits_df_dict,splits_features_dict,device):
-
-    train_weights = convert_to_tensor(compute_sample_weight('balanced',splits_df_dict['train_df']['Labels'][0]),convert_type=float,device=device)
-    valid_weights = convert_to_tensor(compute_sample_weight('balanced',splits_df_dict['valid_df']['Labels'][0]),convert_type=float,device=device)
-    test_weights =  convert_to_tensor(compute_sample_weight('balanced',splits_df_dict['test_df']['Labels'][0]),convert_type=float,device=device)
-    ood_weights = convert_to_tensor(np.ones(splits_df_dict['ood_df'].shape[0]),convert_type=float,device=device)
-    na_weights =  convert_to_tensor(np.ones(splits_df_dict['no_annotaiton_df'].shape[0]),convert_type=float,device=device)
-
-    splits_features_dict['train_data'] = torch.cat([splits_features_dict['train_data'],train_weights[:,None]],dim=1)
-    splits_features_dict['valid_data'] = torch.cat([splits_features_dict['valid_data'],valid_weights[:,None]],dim=1)
-    splits_features_dict['test_data'] = torch.cat([splits_features_dict['test_data'],test_weights[:,None]],dim=1)
-    splits_features_dict['ood_data'] = torch.cat([splits_features_dict['ood_data'],ood_weights[:,None]],dim=1)
-    splits_features_dict['na_data'] = torch.cat([splits_features_dict['na_data'],na_weights[:,None]],dim=1)
-
-    return
-
-def get_features_per_split(splits_df_dict,device):
-    model_input_cols = ['tokens_id','second_input','seqs_length']
-    #get data and labels for each of the five splits
-    train_data = convert_to_tensor(splits_df_dict["train_df"][model_input_cols].values,convert_type=float,device=device)
-    valid_data = convert_to_tensor(splits_df_dict["valid_df"][model_input_cols].values,convert_type=float,device=device)
-    test_data = convert_to_tensor(splits_df_dict["test_df"][model_input_cols].values,convert_type=float,device=device)
-    ood_data = convert_to_tensor(splits_df_dict["ood_df"][model_input_cols].values,convert_type=float,device=device)
-    na_data = convert_to_tensor(splits_df_dict["no_annotaiton_df"][model_input_cols].values,convert_type=float,device=device)
-    
-    return {"train_data":train_data,"valid_data":valid_data,"test_data":test_data,"ood_data":ood_data,"na_data":na_data}
-
-def get_labels_per_split(splits_df_dict,configs,device):
-    #obtain labels
-    train_labels = splits_df_dict["train_df"]['Labels']
-    valid_labels =splits_df_dict["valid_df"]['Labels']
-    test_labels = splits_df_dict["test_df"]['Labels']
-    ood_labels = splits_df_dict["ood_df"]['Labels']
-    na_labels = splits_df_dict["no_annotaiton_df"]['Labels']
-
-    
-    #encode labels 
-    enc = LabelEncoder()
-    enc.fit(splits_df_dict["train_df"]['Labels'])
-    #save mapping dict to config
-    configs["model_config"].class_mappings = enc.classes_.tolist()
-    train_labels_numeric = convert_to_tensor(enc.transform(train_labels), convert_type=int,device=device)
-    valid_labels_numeric =convert_to_tensor(enc.transform(valid_labels), convert_type=int,device=device)
-    test_labels_numeric =convert_to_tensor(enc.transform(test_labels), convert_type=int,device=device)
-    ood_labels_numeric =convert_to_tensor(np.zeros((ood_labels.shape[0])), convert_type=int,device=device)
-    na_labels_numeric =convert_to_tensor(np.zeros((na_labels.shape[0])), convert_type=int,device=device)
-    
-    #compute class weight
-    class_weights = compute_class_weight(class_weight='balanced',classes=np.unique(train_labels),y=train_labels[0].values)
-    
-    #omegaconfig does not support float64 as datatype so conversion to str is done 
-    # and reconversion is done in criterion
-    configs['model_config'].class_weights = [str(x) for x in list(class_weights)]
-
-
-    return {"train_labels":train_labels,
-            "valid_labels":valid_labels,
-            "test_labels":test_labels,
-            "ood_labels":ood_labels,
-            "na_labels":na_labels,
-
-            "train_labels_numeric":train_labels_numeric,
-            "valid_labels_numeric":valid_labels_numeric,
-            "test_labels_numeric":test_labels_numeric,
-            "ood_labels_numeric":ood_labels_numeric,
-            "na_labels_numeric":na_labels_numeric
-    }
-
-def get_seqs_per_split(splits_df_dict,configs):
-    train_rna_seq = revert_seq_tokenization(splits_df_dict["train_df"]["tokens"],configs)
-    valid_rna_seq = revert_seq_tokenization(splits_df_dict["valid_df"]["tokens"],configs)
-    test_rna_seq = revert_seq_tokenization(splits_df_dict["test_df"]["tokens"],configs)
-    ood_rna_seq = revert_seq_tokenization(splits_df_dict["ood_df"]["tokens"],configs)
-    na_rna_seq = revert_seq_tokenization(splits_df_dict["no_annotaiton_df"]["tokens"],configs)
-
-    return {"train_rna_seq":train_rna_seq,
-            "valid_rna_seq":valid_rna_seq,
-            "test_rna_seq":test_rna_seq,
-            "ood_rna_seq":ood_rna_seq,
-            "na_rna_seq":na_rna_seq}
-
-def create_artificial_dataset(size):
-    ntds = ['A','C','G','T']
-    max_len = size["seq_len_dist"].index.max()
-
-    samples_ntds = np.random.choice(ntds,(size["num_seqs"],max_len))
-    artificial_seqs = np.array([''.join(samples_ntds[i,:]) for i in range(samples_ntds.shape[0])])
-
-    possible_seq_lengths = size["seq_len_dist"].index.to_numpy()
-    prob_per_length = size["seq_len_dist"].values/sum(size["seq_len_dist"].values)
-
-    artificial_seqs_length = np.random.choice(possible_seq_lengths,size = size["num_seqs"],p = prob_per_length)
-
-    #truncate seqs according to the seq_len distribution
-    for seq_idx,seq in enumerate(artificial_seqs):
-        artificial_seqs[seq_idx] = seq[0:artificial_seqs_length[seq_idx]]
-   
-
-    artificial_secondary = fold_sequences(artificial_seqs,temperature=37)[f'structure_37'].values
-
-    artificial_df = pd.DataFrame({'Sequences':artificial_seqs,'Secondary':artificial_secondary,'Labels':0})
-    return artificial_df
-
-def prepare_artificial_data(dataset_class,size,device):
-    #create artificial dataset based on uniform sampling of nucleotides
-    artificial_df = create_artificial_dataset(size)
-    dataset_class.seqs_dot_bracket_labels = artificial_df
-    processed_artificial_df = dataset_class.get_preprocessed_data_df().sample(frac=1)
-    model_input_cols = ['tokens_id','second_input','seqs_length']
-    artificial_data = convert_to_tensor(processed_artificial_df[model_input_cols].values,convert_type=float,device=device)
-    art_weights =  convert_to_tensor(np.ones(artificial_data.shape[0]),convert_type=float,device=device)
-    artificial_data = torch.cat([artificial_data,art_weights[:,None]],dim=1)
-
-    artificial_labels_numeric =convert_to_tensor(np.zeros((processed_artificial_df['Labels'].shape[0])), convert_type=int,device=device)
-    artificial_labels = processed_artificial_df['Labels']
-    artificial_rna_seq = artificial_df[["Sequences"]]
-    return {"artificial_data":artificial_data,
-            "artificial_labels":artificial_labels,
-            "artificial_labels_numeric":artificial_labels_numeric,
-            "artificial_rna_seq":artificial_rna_seq}
-
-def append_na_to_train(all_data):
-    all_data["train_data"] = torch.cat((all_data["train_data"],all_data["na_data"]))
-    all_data["train_labels_numeric"] = torch.cat((all_data["train_labels_numeric"],all_data["na_labels_numeric"]))
-    all_data["train_labels"] = all_data['train_labels'].append(all_data['na_labels']).reset_index(drop=True)
-    all_data["train_rna_seq"] = all_data['train_rna_seq'].append(all_data['na_rna_seq'])
-
-    entries_to_remove = ('na_data', 'na_labels','na_labels_numeric','na_rna_seq')
-    for k in entries_to_remove:
-        all_data.pop(k, None)
-    return all_data
-
-def prepare_data_tcga(dataset_class, configs):
-    """
-    This function recieves anddata and prepares the anndata in a format suitable for training
-    It also set default parameters in the config that cannot be known until preprocessing step
-    is done.
-    all_data_df is heirarchical pandas dataframe, so can be accessed  [AA,AT,..,AC ]
-    """
-    device = configs["train_config"].device
-
-    all_data_df = dataset_class.get_preprocessed_data_df().sample(frac=1)
-
-    #split data 
-    if configs['trained_on'] == 'full':
-        splits_df_dict =  split_tcga_data_keep_all_sc(all_data_df,configs)
-    elif configs['trained_on'] == 'id':
-        splits_df_dict =  split_tcga_data(all_data_df,configs)
-    
-    train_val_counts = splits_df_dict['train_df'].Labels.value_counts()[splits_df_dict['train_df'].Labels.value_counts()>0]
-    train_num_samples = sum(train_val_counts)
-    num_scs = len(train_val_counts)
-    #log
-    print(f'Training with {num_scs} sub classes and {train_num_samples} samples')
-
-    #get features, labels, and seqs per split
-    splits_features_dict = get_features_per_split(splits_df_dict,device)
-    append_sample_weights(splits_df_dict,splits_features_dict,device)
-    splits_labels_dict = get_labels_per_split(splits_df_dict,configs,device)
-    splits_seqs_dict = get_seqs_per_split(splits_df_dict,configs)
-
-    #get desired artificial data split
-    size_dict = {
-                "seq_len_dist":dataset_class.seq_len_dist,
-                "num_seqs":200}
-    artificial_data_dict = prepare_artificial_data(dataset_class,size_dict,device)
-
-    
-    #prepare validation set for skorch
-    valid_ds = Dataset(splits_features_dict["valid_data"],splits_labels_dict["valid_labels_numeric"])
-    valid_ds = predefined_split(valid_ds)
-
-    #combine all dicts
-    all_data = splits_features_dict | splits_labels_dict | splits_seqs_dict | \
-        {"valid_ds":valid_ds} | artificial_data_dict
-
-    ###update configs
-    update_config_with_dataset_params_tcga(dataset_class,all_data_df,configs)
-    configs["model_config"].num_classes = len(all_data['train_labels'][0].unique())
-    configs["train_config"].batch_per_epoch = int(all_data["train_data"].shape[0]\
-        /configs["train_config"].batch_size)
-
-    get_inference_data(configs,dataset_class,all_data)
-
-    #save token dicts
-    save(data = dataset_class.second_input_tokens_ids_dict,path = os.getcwd()+'/second_input_tokens_ids_dict')
-    save(data = dataset_class.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
-    #save token dicts
-    save(data = dataset_class.second_input_tokens_ids_dict,path = os.getcwd()+'/second_input_tokens_ids_dict')
-    save(data = dataset_class.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
-    return all_data
-
 def introduce_mismatches(seq, n_mismatches):
     seq = list(seq)
     for i in range(n_mismatches):
         rand_nt = randint(0,len(seq)-1)
         seq[rand_nt] = ['A','G','C','T'][randint(0,3)]
     return ''.join(seq)
-
 
 def prepare_inference_results_benchmarck(net,cfg,predicted_labels,logits,all_data):
     iterables = [["Sequences"], np.arange(1, dtype=int)]

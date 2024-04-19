@@ -32,16 +32,16 @@ class IDModelAugmenter:
     def predict_transforna_na(self) -> Tuple:
         infer_pd = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
 
-        try:
+        if True:
             inference_config = update_config_with_inference_params(self.config)
             
             #path should be infer_cfg["model_path"] - 2 level + embedds
             path = '/'.join(inference_config['inference_settings']["model_path"].split('/')[:-2])+'/embedds'
             #read threshold
-            results:Results_Handler = Results_Handler(path=path,splits=['train','na'])
+            results:Results_Handler = Results_Handler(path=path,splits=['train','no_annotation'])
             results.get_knn_model()
             threshold = load(results.analysis_path+"/novelty_model_coef")["Threshold"]
-            sequences = results.splits_df_dict['na_df'][results.seq_col].values[:,0]
+            sequences = results.splits_df_dict['no_annotation_df'][results.seq_col].values[:,0]
             with redirect_stdout(None):
                 root_dir = Path(__file__).parents[3].absolute()
                 inference_config, net = get_model(inference_config, root_dir)
@@ -52,19 +52,18 @@ class IDModelAugmenter:
 
             prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
             infer_pd = all_data["infere_rna_seq"]
-
             
             #compute lev distance for embedds and 
             print('computing levenstein distance for the NA set by the ID models')
-            _,_,_,_,_,lev_dist = get_closest_ngbr_per_split(results,'na')
+            _,_,_,_,_,lev_dist = get_closest_ngbr_per_split(results,'no_annotation')
             
             print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
             infer_pd['Is Familiar?'] = [True if lv<threshold else False for lv in lev_dist]
             infer_pd['Threshold'] = threshold
             print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
             return infer_pd.rename_axis("Sequence").reset_index()
-        except:
-            print('Could not load predictions from TransForNA, check if ID models exist in the desired structure')
+        else:
+            print('Could not load predictions from TransfoRNA, check if ID models exist in the desired structure')
             return infer_pd
 
     def include_id_model_predictions(self):
@@ -347,10 +346,6 @@ class PrecursorAugmenter:
                 if abs(curr_bin_no - (bin_no+1)) > 1:
                     continue
                 assert curr_bin_no == bin_no+1, f'curr_bin_no is {curr_bin_no} and bin_no is {bin_no+1}'
-        
-        #introduct mismatches
-        #for i in range(len(sampled_seqs)):
-        #    sampled_seqs[i] = introduce_mismatches(sampled_seqs[i], randint(1,2))
             
         return pd.DataFrame(index=sampled_seqs, data=[sc]*len(sampled_seqs)\
             , columns =['Labels'])
@@ -457,26 +452,20 @@ class DataAugmenter:
         self.df['Labels'] = self.df['Labels'].cat.add_categories('artificial_affix')
         self.df.loc[aa_seqs,'Labels'] = 'artificial_affix'
 
-    def id_pipeline(self):
-        df = self.precursor_augmenter.get_augmented_df()
-        self.combine_df(df)
-        return self.df
-
 
     
     def full_pipeline(self):
         self.df = self.id_model_augmenter.get_augmented_df()
+
+    
+    def post_augmentation(self):
         random_df = self.random_augmenter.get_augmented_df()
         df = self.precursor_augmenter.get_augmented_df()
         fusion_df = self.fusion_augmenter.get_augmented_df()
         df = df.append(fusion_df).append(random_df)
         self.df['Labels'] = self.df['Labels'].cat.add_categories({'random','recombined'})
         self.combine_df(df)
-        return self.df
 
-
-    
-    def post_augmentation(self):
         self.convert_to_major_class_labels()
         self.annotate_artificial_affix_seqs()
         self.df['Labels'] = self.df['Labels'].cat.remove_unused_categories()
@@ -488,8 +477,6 @@ class DataAugmenter:
         return self.df
 
     def get_augmented_df(self):
-        if self.trained_on == 'id':
-            self.id_pipeline()
-        elif self.trained_on == 'full':
+        if self.trained_on == 'full':
             self.full_pipeline()
         return self.post_augmentation()

@@ -18,11 +18,10 @@ from sklearn.metrics import (auc, f1_score, precision_recall_curve,
                              roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
 
-from transforna.inference_api import predict_transforna
-from transforna.utils.file import load, save
-from transforna.utils.tcga_post_analysis_utils import Results_Handler
-from transforna.utils.utils import get_closest_ngbr_per_split, get_fused_seqs
-
+from ..inference_api import predict_transforna
+from ..utils.file import load, save
+from ..utils.tcga_post_analysis_utils import Results_Handler
+from ..utils.utils import get_closest_ngbr_per_split, get_fused_seqs
 
 def log_lev_params(threshold:float,analysis_path:str):
     model_params = {"Threshold": threshold}
@@ -166,12 +165,10 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
     return sum(thresholds)/len(thresholds)
 
 
-if __name__ == "__main__":
+def compute_nlds(trained_on,model):
     #######################################TO CONFIGURE#############################################
-    trained_on = sys.argv[1]
-    model = sys.argv[2]
-    path = f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
-    splits = ['train','valid','test','ood','artificial','na']
+    path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
+    splits = ['train','valid','test','ood','artificial','no_annotation']
     #run name
     run_name = None #if None, then the name of the model inputs will be used as the name
     #this could be for instance 'Sup Seq-Exp'
@@ -182,25 +179,12 @@ if __name__ == "__main__":
     results.get_knn_model()
     lev_dist_df = pd.DataFrame()
     
-    aa_seqs_5 = results.ad.var[~results.ad.var['five_prime_adapter_filter']].index.tolist()
-    results.splits_df_dict['5-prime_df'] = results.splits_df_dict['artificial_affix_df'][results.splits_df_dict['artificial_affix_df']['RNA Sequences'].isin(aa_seqs_5).values]
-
-    fused_seqs = get_fused_seqs(results.splits_df_dict['train_df']['RNA Sequences'].values.flatten(),num_sequences=200)
-
-    fused_emb_df = predict_transforna(fused_seqs,model=f'{model}',embedds_flag=True,trained_on=trained_on)
-    
-    #rename fused_emb_df columns to results.embedds_cols
-    fused_emb_df.columns = results.embedds_cols[:len(fused_emb_df.columns)]
-    
-    fused_emb_df['RNA Sequences'] = fused_emb_df.index
-    fused_emb_df['split'] = 'fused_df'
-    results.splits_df_dict['fused_df'] = fused_emb_df
     
     #compute levenstein distance per split
     for split in results.splits_df_dict.keys():
         if len(results.splits_df_dict[f'{split}']) == 0:
             continue
-        split_seqs,split_labels,top_n_seqs,top_n_labels,distances,lev_dist = get_closest_ngbr_per_split(results,split.split('_')[0])
+        split_seqs,split_labels,top_n_seqs,top_n_labels,distances,lev_dist = get_closest_ngbr_per_split(results,'_'.join(split.split('_')[:-1]))
         #create df from split and levenstein distance
         lev_dist_split_df = pd.DataFrame({'split':split,'lev_dist':lev_dist,'seqs':split_seqs,'labels':split_labels,'top_n_seqs':top_n_seqs,'top_n_labels':top_n_labels})
         #append to lev_dist_df
@@ -216,19 +200,13 @@ if __name__ == "__main__":
     fig.write_image(f'{results.figures_path}/lev_distance_distribution.png')
 
     #get rows of lev_dist_df from ood split and from test split
-    ood_df = lev_dist_df[lev_dist_df['split'] == 'ood_df']
+    artificial_affix_df = lev_dist_df[lev_dist_df['split'] == 'artificial_affix_df']
     test_df = lev_dist_df[lev_dist_df['split'] == 'test_df']
     
     lev_dist_df.to_csv(f'{results.analysis_path}/lev_dist_df.csv')
    
     #compute novelty clf metrics
-    threshold = compute_novelty_clf_metrics(results,test_df['lev_dist'].values,ood_df['lev_dist'].values)
-
-    lev_dist_df['novel'] = lev_dist_df['lev_dist'] > threshold
-
-    #get aa_df where split is 5_prime_df or hbdx_spike_df
-
-    aa_df = lev_dist_df[(lev_dist_df['split'] == '5_prime_df') | (lev_dist_df['split'] == 'hbdx_spike_df')]
+    compute_novelty_clf_metrics(results,test_df['lev_dist'].values,artificial_affix_df['lev_dist'].values)
 
 
 

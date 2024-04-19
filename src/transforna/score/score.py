@@ -261,7 +261,7 @@ def compute_score_tcga(
             scoring_function = cb.scoring._score_func
             break
 
-    splits = ['train','valid','test','ood','na','artificial']
+    splits = ['train','valid','test','ood','no_annotation','artificial']
 
     #filter redundant seqs in case of seq-exp
     filter_augmented_exp(all_data)
@@ -271,12 +271,17 @@ def compute_score_tcga(
         # reset tensors
         net.gene_embedds = []
         net.second_input_embedds = []
-
-        score = generate_embedding(net,embedds_path,scoring_function,all_data[f"{split}_data"],all_data[f"{split}_rna_seq"],\
-                            all_data[f"{split}_labels"],all_data[f"{split}_labels_numeric"],f'{split}',\
-                                cfg['model_config'],cfg['train_config'],cfg['log_embedds'])
-        if split == 'test':
-            test_score = score
+        try:
+            score = generate_embedding(net,embedds_path,scoring_function,all_data[f"{split}_data"],all_data[f"{split}_rna_seq"],\
+                                all_data[f"{split}_labels"],all_data[f"{split}_labels_numeric"],f'{split}',\
+                                    cfg['model_config'],cfg['train_config'],cfg['log_embedds'])
+            if split == 'test':
+                test_score = score
+        except:
+            trained_on = cfg['trained_on']
+            print(f'Skipping {split} split, as no split is split is empty in models trained on {trained_on}!')
+            
+        
             
     return test_score
         

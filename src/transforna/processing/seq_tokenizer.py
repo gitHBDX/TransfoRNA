@@ -1,4 +1,5 @@
 
+import os
 import math
 import warnings
 from random import randint
@@ -9,6 +10,7 @@ from numpy.lib.stride_tricks import as_strided
 from omegaconf import DictConfig
 
 from ..utils import energy
+from ..utils.file import save
 
 
 class SeqTokenizer:
@@ -265,7 +267,15 @@ class SeqTokenizer:
 
         return result[np.arange(arr.shape[0]), (n-m)%n]
 
-    def get_preprocessed_data_df(self,inference:bool=False):
+    def save_token_dicts(self):
+        #save token dicts
+        save(data = self.second_input_tokens_ids_dict,path = os.getcwd()+'/second_input_tokens_ids_dict')
+        save(data = self.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
+        #save token dicts
+        save(data = self.second_input_tokens_ids_dict,path = os.getcwd()+'/second_input_tokens_ids_dict')
+        save(data = self.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
+
+    def get_tokenized_data(self,inference:bool=False):
         #tokenize sequences
         samples_tokenized,sample_token_ids = self.tokenize_samples(self.window,self.seq,inference)
 
@@ -322,4 +332,6 @@ class SeqTokenizer:
 
         all_df = labels_df.join(tokens_df).join(tokens_id_df).join(sec_input_df).join(seqs_length_df)
 
+        #save token dicts
+        self.save_token_dicts()
         return all_df

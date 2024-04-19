@@ -22,9 +22,8 @@ from transforna.utils.tcga_post_analysis_utils import Results_Handler
 def entropy_clf(results,random_state:int=1):
     #clf entropy is test vs ood if sub_class else vs loco_not_in_train
     if results.mc_flag:
-        ood_ent = results.splits_df_dict["loco_not_in_train_df"]["Entropy"]["0"].values
-    else:
-        ood_ent = results.splits_df_dict["ood_df"]["Entropy"]["0"].values
+        ood_ent = results.splits_df_dict["artificial_affix_df"]["Entropy"]["0"].values
+
     if results.trained_on == 'id':
         test_ent = results.splits_df_dict["test_df"]["Entropy"]["0"].values
     else:
@@ -177,7 +176,7 @@ def compute_entropy_per_split(results:Results_Handler):
     
 def compute_novelty_prediction_per_split(results,model):
     #add noovelty prediction for all splits
-    for split in splits:
+    for split in results.splits:
         results.splits_df_dict[f'{split}_df']['Novelty Prediction','is_known_class'] = results.splits_df_dict[f'{split}_df']['Entropy','0']<= model.threshold
     
 
@@ -234,12 +233,10 @@ def compute_logits_clf_metrics(results):
     
 
 
-if __name__ == "__main__":
+def compute_entropies(trained_on,model):
     #######################################TO CONFIGURE#############################################
-    trained_on = sys.argv[1]
-    model = sys.argv[2]
-    path = f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
-    splits = ['train','valid','test','ood','artificial','na']
+    path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
+    splits = ['train','valid','test','ood','artificial','no_annotation']
     #run name
     run_name = None #if None, then the name of the model inputs will be used as the name
     #this could be for instance 'Sup Seq-Exp'
@@ -248,10 +245,8 @@ if __name__ == "__main__":
 
     results.append_loco_variants()
 
-    if 'artificial_affix' in results.splits:
-        results.splits[-1:-1] = ['artificial_affix','loco_not_in_train','loco_mixed','loco_in_train']
-    else:
-        results.splits[-1:-1] = ['loco_not_in_train','loco_mixed','loco_in_train']
+    results.splits[-1:-1] = ['artificial_affix','loco_not_in_train','loco_mixed','loco_in_train']
+
     
     if results.mc_flag:
         results.splits.remove("ood")
@@ -265,7 +260,7 @@ if __name__ == "__main__":
 
     test_whisker_UB = plot_entropy(results)
     print("plotting entropy per unique length")
-    plot_entropy_per_unique_length(results,'artificial')
+    plot_entropy_per_unique_length(results,'artificial_affix')
     print('plotting entropy per unique length for ood')
     #decompose outliers in ID
     print("plotting outliers")
