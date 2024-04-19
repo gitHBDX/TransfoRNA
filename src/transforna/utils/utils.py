@@ -31,90 +31,7 @@ from .energy import *
 from .file import load
 
 
-def get_fused_seqs(seqs,num_sequences:int=1,max_len:int=30):
-    '''
-    fuse num_sequences sequences from seqs
-    '''
-    fused_seqs = []
-    while len(fused_seqs) < num_sequences:
-        #get two random sequences
-        seq1 = random.choice(seqs)[:max_len]
-        seq2 = random.choice(seqs)[:max_len]
-        
-        #select indeex to tuncate seq1 at between 60 to 70% of its length
-        idx = random.randint(math.floor(len(seq1)*0.3),math.floor(len(seq1)*0.7))
-        len_to_be_added_from_seq2 = len(seq1)-idx
-        #truncate seq1 at idx
-        seq1 = seq1[:idx]
-        #get the rest from the beg of seq2
-        seq2 = seq2[:len_to_be_added_from_seq2]
-        #fuse seq1 and seq2
-        fused_seq = seq1+seq2
 
-        if fused_seq not in fused_seqs and fused_seq not in seqs:
-            fused_seqs.append(fused_seq)
-
-    return fused_seqs
-
-def get_lev_dist(seqs_a_list:List[str],seqs_b_list:List[str]):
-    '''
-    compute levenstein distance between two lists of sequences and normalize by the length of the longest sequence
-    The lev distance is computed between seqs_a_list[i] and seqs_b_list[i]
-    '''
-    lev_dist = []
-    for i in range(len(seqs_a_list)):
-        dist = distance(seqs_a_list[i],seqs_b_list[i])
-        #normalize
-        dist = dist/max(len(seqs_a_list[i]),len(seqs_b_list[i]))
-        lev_dist.append(dist)
-    return lev_dist
-
-def get_closest_neighbors(results:Results_Handler,query_embedds:np.ndarray,num_neighbors:int=1):
-    '''
-    get the closest neighbors to the query embedds using the knn model in results
-    The closest neighbors are to be found in the training set
-    '''
-    #norm infer embedds
-    query_embedds = query_embedds/np.linalg.norm(query_embedds,axis=1)[:,None]
-    #get top 1 seqs
-    distances, indices = results.knn_model.kneighbors(query_embedds)
-    distances = distances[:,:num_neighbors].flatten()
-    #flatten distances
-
-    indices = indices[:,:num_neighbors]
-
-    top_n_seqs = np.array(results.knn_seqs)[indices][:,:num_neighbors]
-    top_n_seqs = [seq[0] for sublist in top_n_seqs for seq in sublist]
-    top_n_labels = np.array(results.knn_labels)[indices][:,:num_neighbors]
-    top_n_labels = [label[0] for sublist in top_n_labels for label in sublist]
-    
-    return top_n_seqs,top_n_labels,distances
-
-def get_closest_ngbr_per_split(results:Results_Handler,split:str,num_neighbors:int=1):
-    '''
-    compute levenstein distance between the sequences in split and their closest neighbors in the training set
-    '''
-    split_df = results.splits_df_dict[f'{split}_df']
-    #log
-    print(f'number of sequences in {split} is {split_df.shape[0]}')
-    #accomodate for multi-index df or single index
-    try:
-        split_seqs = split_df[results.seq_col].values[:,0]
-    except:
-        split_seqs = split_df[results.seq_col].values
-    try:
-        split_labels = split_df[results.label_col].values[:,0]
-    except:
-        split_labels = None
-    #get embedds
-    embedds = split_df[results.embedds_cols].values
-    
-    top_n_seqs,top_n_labels,distances = get_closest_neighbors(results,embedds,num_neighbors)
-    #get levenstein distance
-    #for each split_seqs duplicate it num_neighbors times
-    split_seqs = [seq for seq in split_seqs for _ in range(num_neighbors)]
-    lev_dist = get_lev_dist(split_seqs,top_n_seqs)
-    return split_seqs,split_labels,top_n_seqs,top_n_labels,distances,lev_dist
 
 def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sc',trained_on:str = 'id',path_to_models:str = 'models/tcga/') -> DictConfig:
     inference_config = config.copy()
@@ -213,6 +130,19 @@ def instantiate_predictor(skorch_cfg: DictConfig,cfg:DictConfig,path: str=None):
     net.initialized_=True
     return net
 
+def revert_seq_tokenization(tokenized_seqs,configs):
+        window = configs["model_config"].window
+        if configs["model_config"].tokenizer != "overlap":
+            print("Sequences are not reverse tokenized")
+            return tokenized_seqs
+        
+        #currently only overlap tokenizer can be reverted
+        seqs_concat = []
+        for seq in tokenized_seqs.values:
+            seqs_concat.append(''.join(seq[seq!='pad'])[::window]+seq[seq!='pad'][-1][window-1])
+        
+        return pd.DataFrame(seqs_concat,columns=["Sequences"])
+
 def prepare_split(split_data_df,configs):
     '''
     This function returns tokens, token ids and labels for a given dataframes' split.
@@ -292,14 +222,7 @@ def stratify(train_data,train_labels,valid_size):
     return train_test_split(train_data, train_labels,
                                                     stratify=train_labels, 
                                                     test_size=valid_size)
-
-def convert_to_tensor(in_arr,convert_type,device):
-    tensor_dtype = torch.long if convert_type == int else torch.float
-    return torch.tensor(
-        np.array(in_arr, dtype=convert_type),
-        dtype=tensor_dtype,
-    ).to(device=device)
-        
+ 
 def prepare_data_benchmark(tokenizer,test_ad, configs):
     """
     This function recieves anddata and prepares the anndata in a format suitable for training

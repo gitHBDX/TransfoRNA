@@ -18,10 +18,69 @@ from sklearn.metrics import (auc, f1_score, precision_recall_curve,
                              roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
 
-from ..inference_api import predict_transforna
 from ..utils.file import load, save
 from ..utils.tcga_post_analysis_utils import Results_Handler
-from ..utils.utils import get_closest_ngbr_per_split, get_fused_seqs
+
+def get_lev_dist(seqs_a_list:List[str],seqs_b_list:List[str]):
+    '''
+    compute levenstein distance between two lists of sequences and normalize by the length of the longest sequence
+    The lev distance is computed between seqs_a_list[i] and seqs_b_list[i]
+    '''
+    lev_dist = []
+    for i in range(len(seqs_a_list)):
+        dist = distance(seqs_a_list[i],seqs_b_list[i])
+        #normalize
+        dist = dist/max(len(seqs_a_list[i]),len(seqs_b_list[i]))
+        lev_dist.append(dist)
+    return lev_dist
+
+def get_closest_neighbors(results:Results_Handler,query_embedds:np.ndarray,num_neighbors:int=1):
+    '''
+    get the closest neighbors to the query embedds using the knn model in results
+    The closest neighbors are to be found in the training set
+    '''
+    #norm infer embedds
+    query_embedds = query_embedds/np.linalg.norm(query_embedds,axis=1)[:,None]
+    #get top 1 seqs
+    distances, indices = results.knn_model.kneighbors(query_embedds)
+    distances = distances[:,:num_neighbors].flatten()
+    #flatten distances
+
+    indices = indices[:,:num_neighbors]
+
+    top_n_seqs = np.array(results.knn_seqs)[indices][:,:num_neighbors]
+    top_n_seqs = [seq[0] for sublist in top_n_seqs for seq in sublist]
+    top_n_labels = np.array(results.knn_labels)[indices][:,:num_neighbors]
+    top_n_labels = [label[0] for sublist in top_n_labels for label in sublist]
+    
+    return top_n_seqs,top_n_labels,distances
+
+def get_closest_ngbr_per_split(results:Results_Handler,split:str,num_neighbors:int=1):
+    '''
+    compute levenstein distance between the sequences in split and their closest neighbors in the training set
+    '''
+    split_df = results.splits_df_dict[f'{split}_df']
+    #log
+    print(f'number of sequences in {split} is {split_df.shape[0]}')
+    #accomodate for multi-index df or single index
+    try:
+        split_seqs = split_df[results.seq_col].values[:,0]
+    except:
+        split_seqs = split_df[results.seq_col].values
+    try:
+        split_labels = split_df[results.label_col].values[:,0]
+    except:
+        split_labels = None
+    #get embedds
+    embedds = split_df[results.embedds_cols].values
+    
+    top_n_seqs,top_n_labels,distances = get_closest_neighbors(results,embedds,num_neighbors)
+    #get levenstein distance
+    #for each split_seqs duplicate it num_neighbors times
+    split_seqs = [seq for seq in split_seqs for _ in range(num_neighbors)]
+    lev_dist = get_lev_dist(split_seqs,top_n_seqs)
+    return split_seqs,split_labels,top_n_seqs,top_n_labels,distances,lev_dist
+
 
 def log_lev_params(threshold:float,analysis_path:str):
     model_params = {"Threshold": threshold}

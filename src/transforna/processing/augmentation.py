@@ -10,9 +10,10 @@ import pandas as pd
 from ..utils.energy import fold_sequences
 from ..utils.file import load
 from ..utils.tcga_post_analysis_utils import Results_Handler
-from ..utils.utils import (get_closest_ngbr_per_split, get_model,
+from ..utils.utils import (get_model,
                            infer_from_pd, prepare_inference_results_tcga,
                            update_config_with_inference_params)
+from ..novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
 from .seq_tokenizer import SeqTokenizer
 
 

@@ -21,15 +21,14 @@ from transforna.utils.tcga_post_analysis_utils import Results_Handler
 
 def entropy_clf(results,random_state:int=1):
     #clf entropy is test vs ood if sub_class else vs loco_not_in_train
-    if results.mc_flag:
-        ood_ent = results.splits_df_dict["artificial_affix_df"]["Entropy"]["0"].values
+    art_affix_ent = results.splits_df_dict["artificial_affix_df"]["Entropy"]["0"].values
 
     if results.trained_on == 'id':
         test_ent = results.splits_df_dict["test_df"]["Entropy"]["0"].values
     else:
         test_ent = results.splits_df_dict["train_df"]["Entropy"]["0"].values[:int(0.25*len(results.splits_df_dict["train_df"]))]
-    ent_x = np.concatenate((ood_ent,test_ent))
-    ent_labels = np.concatenate((np.zeros(ood_ent.shape),np.ones(test_ent.shape)))
+    ent_x = np.concatenate((art_affix_ent,test_ent))
+    ent_labels = np.concatenate((np.zeros(art_affix_ent.shape),np.ones(test_ent.shape)))
     trainX, testX, trainy, testy = train_test_split(ent_x, ent_labels, stratify=ent_labels,test_size=0.9, random_state=random_state)
 
     model = LogisticRegression(solver='lbfgs',class_weight='balanced')

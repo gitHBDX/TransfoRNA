@@ -12,7 +12,7 @@ from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
 from ..utils.energy import fold_sequences
 from ..utils.file import save
-from ..utils.utils import update_config_with_dataset_params_benchmark,update_config_with_dataset_params_tcga
+from ..utils.utils import update_config_with_dataset_params_benchmark,update_config_with_dataset_params_tcga,revert_seq_tokenization
 import math 
 
 
@@ -87,24 +87,12 @@ class PrepareGeneData:
 
         return labels_dict | labels_numeric_dict
     
-    def revert_seq_tokenization(self,tokenized_seqs):
-        window = self.configs["model_config"].window
-        if self.configs["model_config"].tokenizer != "overlap":
-            print("Sequences are not reverse tokenized")
-            return tokenized_seqs
-        
-        #currently only overlap tokenizer can be reverted
-        seqs_concat = []
-        for seq in tokenized_seqs.values:
-            seqs_concat.append(''.join(seq[seq!='pad'])[::window]+seq[seq!='pad'][-1][window-1])
-        
-        return pd.DataFrame(seqs_concat,columns=["Sequences"])
 
     def get_seqs_per_split(self):
         rna_seq_dict = {}
         for split_df in self.splits_df_dict.keys():
             split = '_'.join(split_df.split('_')[:-1])
-            rna_seq_dict[f'{split}_rna_seq'] = self.revert_seq_tokenization(self.splits_df_dict[split_df]["tokens"])
+            rna_seq_dict[f'{split}_rna_seq'] = revert_seq_tokenization(self.splits_df_dict[split_df]["tokens"],self.configs)
 
         return rna_seq_dict
 
