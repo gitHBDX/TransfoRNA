@@ -7,6 +7,8 @@ import logging
 
 import numpy as np
 import pandas as pd
+from difflib import get_close_matches
+import json
 
 from joblib import Parallel, delayed
 import multiprocessing
@@ -355,7 +357,235 @@ def get_five_prime_adapter_info(annotation_df, five_prime_adapter):
     
     return adapter_df
 
+#%%
+@log_time(log)
+def reduce_ambiguity(annotation_df: pd.DataFrame) -> pd.DataFrame:
+    """Reduce ambiguity by 
 
+    a) using subclass_name of precursor with shortest genomic context, if all other assigned precursors overlap with its genomic region
+    
+    b) using subclass_name whose bin is at the 5' or 3' end of the precursor
+
+    Parameters
+    ----------
+    annotation_df : pd.DataFrame
+        A DataFrame containing the annotation of the sequences (var)
+
+    Returns
+    -------
+    pd.DataFrame
+        An improved version of the input DataFrame with reduced ambiguity
+    """
+
+    # extract ambigious assignments for subclass name
+    ambigious_matches_df = annotation_df[annotation_df.subclass_name.str.contains(';',na=False)]
+    if len(ambigious_matches_df) == 0:
+        print('No ambigious assignments for subclass name found.')
+        return annotation_df
+    clear_matches_df = annotation_df[~annotation_df.subclass_name.str.contains(';',na=False)]
+
+    # extract required information from HBDxBase
+    HBDxBase_all_df = pd.read_csv(HBDxBase_csv, index_col=0)
+    bin_dict = HBDxBase_all_df[['precursor_name','precursor_bins']].set_index('precursor_name').to_dict()['precursor_bins']
+    sRNA_class_dict = HBDxBase_all_df[['precursor_name','small_RNA_class_annotation']].set_index('precursor_name').to_dict()['small_RNA_class_annotation']
+    pseudo_class_dict = HBDxBase_all_df[['precursor_name','pseudo_class']].set_index('precursor_name').to_dict()['pseudo_class']
+    sc_type_dict = HBDxBase_all_df[['precursor_name','subclass_type']].set_index('precursor_name').to_dict()['subclass_type']
+    genomic_context_bed = HBDxBase_all_df[['chr','start','end','precursor_name','score','strand']]
+    genomic_context_bed.columns = ['seq_id','start','end','name','score','strand']
+    genomic_context_bed.reset_index(drop=True, inplace=True)
+    genomic_context_bed['genomic_length'] = genomic_context_bed.end - genomic_context_bed.start
+
+
+    def get_overlaps(genomic_context_bed: pd.DataFrame, name: str = None, complement: bool = False) -> list:
+        """Get genomic overlap of a given precursor name
+
+        Parameters
+        ----------
+        genomic_context_bed : pd.DataFrame
+            A DataFrame containing genomic locations of precursors in bed format
+        with column names: 'chr','start','end','precursor_name','score','strand'
+        name : str
+            The name of the precursor to get genomic context for
+        complement : bool
+            If True, return all precursors that do not overlap with the given precursor
+
+        Returns
+        -------
+        list
+            A list containing the precursors in the genomic (anti-)context of the given precursor 
+            (including the precursor itself)
+        """
+        series_OI = genomic_context_bed[genomic_context_bed['name'] == name]
+        start = series_OI['start'].values[0]
+        end = series_OI['end'].values[0]
+        seq_id = series_OI['seq_id'].values[0]
+        strand = series_OI['strand'].values[0]
+
+        overlap_df = genomic_context_bed.copy()
+
+        condition = (((overlap_df.start > start) &
+                        (overlap_df.start < end)) |
+                        ((overlap_df.end > start) &
+                        (overlap_df.end < end)) |
+                        ((overlap_df.start < start) &
+                        (overlap_df.end > start)) |
+                        ((overlap_df.start == start) &
+                        (overlap_df.end == end)) |
+                        ((overlap_df.start == start) &
+                        (overlap_df.end > end)) |
+                        ((overlap_df.start < start) &
+                        (overlap_df.end == end)))
+        if not complement:
+            overlap_df = overlap_df[condition]
+        else:
+            overlap_df = overlap_df[~condition]
+        overlap_df = overlap_df[overlap_df.seq_id == seq_id]
+        if strand is not None:
+            overlap_df = overlap_df[overlap_df.strand == strand]
+        overlap_list = overlap_df['name'].tolist()
+        return overlap_list
+
+
+    def check_genomic_ctx_of_smallest_prec(precursor_name: str) -> str:
+        """Check for a given ambigious precursor assignment (several names separated by ';')
+        if all assigned precursors overlap with the genomic region
+        of the precursor with the shortest genomic context
+
+        Parameters
+        ----------
+        precursor_name: str
+            A string containing several precursor names separated by ';'
+
+        Returns
+        -------
+        str
+            The precursor suggested to be used instead of the multi assignment, 
+            or None if the ambiguity could not be resolved
+        """
+        assigned_names = precursor_name.split(';')
+
+        tmp_genomic_context = genomic_context_bed[genomic_context_bed.name.isin(assigned_names)]
+        # get name of smallest genomic region
+        if len(tmp_genomic_context) > 0:
+            smallest_name = tmp_genomic_context.name[tmp_genomic_context.genomic_length.idxmin()]
+            # check if all assigned names are in overlap of smallest genomic region
+            if set(assigned_names).issubset(set(get_overlaps(genomic_context_bed,smallest_name))):
+                return smallest_name
+            else:
+                return None
+        else:
+            return None
+        
+    def get_subclass_name(subclass_name: str, short_prec_match_new_name: str) -> str:
+        """Get subclass name matching to a precursor name from a ambigious assignment (several names separated by ';')
+
+        Parameters
+        ----------
+        subclass_name: str
+            A string containing several subclass names separated by ';'
+        short_prec_match_new_name: str
+            The name of the precursor to be used instead of the multi assignment
+
+        Returns
+        -------
+        str
+            The subclass name suggested to be used instead of the multi assignment, 
+            or None if the ambiguity could not be resolved
+        """
+        if short_prec_match_new_name is not None:
+            matches = get_close_matches(short_prec_match_new_name,subclass_name.split(';'),cutoff=0.2)
+            if matches:
+                return matches[0]
+            else:
+                print(f"Could not find match for {short_prec_match_new_name} in {subclass_name}")
+                return subclass_name
+        else:
+            return None
+
+
+    def check_end_bins(subclass_name: str) -> str:
+        """Check for a given ambigious subclass name assignment (several names separated by ';')
+        if ambiguity can be resolved by selecting the subclass name whose bin matches the 3'/5' end of the precursor
+
+        Parameters
+        ----------
+        subclass_name: str
+            A string containing several subclass names separated by ';'
+
+        Returns
+        -------
+        str
+            The subclass name suggested to be used instead of the multi assignment, 
+            or None if the ambiguity could not be resolved
+        """
+        for name in subclass_name.split(';'):
+            if '_bin-' in name:
+                name_parts = name.split('_bin-')
+                if name_parts[0] in bin_dict and bin_dict[name_parts[0]] == int(name_parts[1]):
+                    return name
+                elif int(name_parts[1]) == 1:
+                    return name
+        return None
+
+
+    def adjust_4_resolved_cases(row: pd.Series) -> tuple:
+        """For a resolved ambiguous subclass names return adjusted values of 
+        precursor_name_full, small_RNA_class_annotation, pseudo_class, and subclass_type 
+
+        Parameters
+        ----------
+        row: pd.Series
+            A row of the var annotation containing the columns 'subclass_name', 'precursor_name_full',
+            'small_RNA_class_annotation', 'pseudo_class', 'subclass_type', and 'ambiguity_resolved'
+
+        Returns
+        -------
+        tuple
+            A tuple containing the adjusted values of 'precursor_name_full', 'small_RNA_class_annotation', 
+            'pseudo_class', and 'subclass_type' for resolved ambiguous cases and the original values for unresolved cases
+        """
+        if row.ambiguity_resolved:
+            matches_prec = get_close_matches(row.subclass_name, row.precursor_name_full.split(';'), cutoff=0.2)
+            if matches_prec:
+                return matches_prec[0], sRNA_class_dict[matches_prec[0]], pseudo_class_dict[matches_prec[0]], sc_type_dict[matches_prec[0]]
+        return row.precursor_name_full, row.small_RNA_class_annotation, row.pseudo_class, row.subclass_type
+    
+    
+    # resolve ambiguity by checking genomic context of smallest precursor
+    ambigious_matches_df['short_prec_match_new_name'] = ambigious_matches_df.precursor_name_full.apply(check_genomic_ctx_of_smallest_prec)
+    ambigious_matches_df['short_prec_match_new_name'] = ambigious_matches_df.apply(lambda x: get_subclass_name(x.subclass_name, x.short_prec_match_new_name), axis=1)
+    ambigious_matches_df['short_prec_match'] = ambigious_matches_df['short_prec_match_new_name'].notnull()
+
+    # resolve ambiguity by checking if bin matches 3'/5' end of precursor
+    ambigious_matches_df['end_bin_match_new_name'] = ambigious_matches_df.subclass_name.apply(check_end_bins)
+    ambigious_matches_df['end_bin_match'] = ambigious_matches_df['end_bin_match_new_name'].notnull()
+
+    # check if short_prec_match and end_bin_match are equal in any case
+    test_df = ambigious_matches_df[((ambigious_matches_df.short_prec_match == True) & (ambigious_matches_df.end_bin_match == True))]
+    if not (test_df.short_prec_match_new_name == test_df.end_bin_match_new_name).all():
+        print('Number of cases where short_prec_match is not matching end_bin_match_new_name:',len(test_df[(test_df.short_prec_match_new_name != test_df.end_bin_match_new_name)]))
+
+    # replace subclass_name with short_prec_match_new_name or end_bin_match_new_name
+    # NOTE: if short_prec_match and end_bin_match are True, short_prec_match_new_name is used
+    ambigious_matches_df['subclass_name'] = ambigious_matches_df.apply(lambda x: x.end_bin_match_new_name if x.end_bin_match == True else x.subclass_name, axis=1)
+    ambigious_matches_df['subclass_name'] = ambigious_matches_df.apply(lambda x: x.short_prec_match_new_name if x.short_prec_match == True else x.subclass_name, axis=1)
+
+    # generate column 'ambiguity_resolved' which is True if short_prec_match and/or end_bin_match is True
+    ambigious_matches_df['ambiguity_resolved'] = ambigious_matches_df.short_prec_match | ambigious_matches_df.end_bin_match
+    print("Ambiguity resolved?\n",ambigious_matches_df.ambiguity_resolved.value_counts(normalize=True))
+
+    # for resolved ambiguous matches, adjust precursor_name_full, small_RNA_class_annotation, pseudo_class, subclass_type
+    ambigious_matches_df[['precursor_name_full','small_RNA_class_annotation','pseudo_class','subclass_type']] = ambigious_matches_df.apply(adjust_4_resolved_cases, axis=1, result_type='expand')
+
+    # drop temporary columns
+    ambigious_matches_df.drop(columns=['short_prec_match_new_name','short_prec_match','end_bin_match_new_name','end_bin_match'], inplace=True)
+    
+    # concat with clear_matches_df
+    clear_matches_df['ambiguity_resolved'] = False
+    improved_annotation_df = pd.concat([clear_matches_df, ambigious_matches_df], axis=0)
+    improved_annotation_df = improved_annotation_df.reindex(annotation_df.index)
+
+    return improved_annotation_df
 
 #%%
 ######################################################################################################
@@ -385,6 +615,9 @@ def add_hico_annotation(annotation_df, five_prime_adapter):
     # add filter column 'five_prime_adapter_filter' and column 'five_prime_adapter_length' indicating the length of the prefixed 5' adapter sequence
     adapter_df = get_five_prime_adapter_info(annotation_df, five_prime_adapter)
     annotation_df = annotation_df.merge(adapter_df, left_on='sequence', right_on='sequence', how='left')
+
+    # apply ambiguity reduction
+    annotation_df = reduce_ambiguity(annotation_df)
 
     # add 'single_class_annotation'
     annotation_df.loc[:,'single_class_annotation'] = np.where(annotation_df.small_RNA_class_annotation.str.contains(';',na=True), False, True)
@@ -472,6 +705,15 @@ def main(five_prime_adapter):
     sRNA_anno_per_seq_df.set_index('sequence', inplace=True)
     sRNA_anno_per_seq_df.to_csv(aggreg_sRNA_anno_file)
     print("\n")
+
+    print('-------- generate subclass_to_annotation dict --------')
+    result_df = sRNA_anno_per_seq_df[['subclass_name', 'small_RNA_class_annotation']].copy()
+    result_df.reset_index(drop=True, inplace=True)
+    result_df.drop_duplicates(inplace=True)
+    result_df = result_df[~result_df["subclass_name"].str.contains(";")] 
+    subclass_to_annotation = dict(zip(result_df["subclass_name"],result_df["small_RNA_class_annotation"]))
+    with open('subclass_to_annotation.json', 'w') as fp:
+        json.dump(subclass_to_annotation, fp)
 
     print('-------- delete tmp files --------')
     os.system("rm *tmp_*")

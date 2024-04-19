@@ -1,6 +1,12 @@
 # The HBDx knowledge-based annotation (KBA) pipeline for small RNA sequences
 
-Most small RNA annotation tools map the sequences sequentially to different small RNA class specific reference databases, which prioritizes the distinct small RNA classes and conceals potential assignment ambiguities. The annotation strategy used here, maps the sequences to the reference sequences of all small RNA classes at the same time starting with zero mismatch tolerance. Unmapped sequences are intended to map with iterating mismatch tolerance up to three mismatches. Additionally, all small RNA sequences are checked for potential bacterial or viral origin, for genomic overlap to human transposable element loci and whether they contain potential prefixes of the 5‘ adapter.
+Most small RNA annotation tools map the sequences sequentially to different small RNA class specific reference databases, which prioritizes the distinct small RNA classes and conceals potential assignment ambiguities. The annotation strategy used here, maps the sequences to the reference sequences of all small RNA classes at the same time starting with zero mismatch tolerance. Unmapped sequences are intended to map with iterating mismatch tolerance up to three mismatches. To reduce ambiguity, sequences are first mapped to the standard coding and non-coding genes with increasing mismatch tolerance. Only then the unassigned sequences are mapped to pseudogenes in the same manner. Additionally, all small RNA sequences are checked for potential bacterial or viral origin, for genomic overlap to human transposable element loci and whether they contain potential prefixes of the 5‘ adapter.
+
+In cases of multiple assignments per sequence (multiple precursors could be the origin of the sequence), the ambigous annotation is resolved if
+    a) all assigned precursors overlap with the genomic region of the precursor with the shortest genomic context -> the subclass name of the precursor with the shortest genomic context is used
+    b) a bin of the assigned subclass names is at the 5' or 3' end of the respective precursor -> the subclass name matching the precursor end is used
+In cases where subclass names of a) and b) are not identical, the subclass name of method a) is assigned.
+
 
 ![kba_pipeline_scheme_v05](https://github.com/gitHBDX/TransfoRNA/assets/79092907/62bf9e36-c7c7-4ff5-b747-c2c651281b42)
 
