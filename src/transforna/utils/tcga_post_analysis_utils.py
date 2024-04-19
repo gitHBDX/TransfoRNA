@@ -9,10 +9,10 @@ import scanpy as sc
 from sklearn.neighbors import NearestNeighbors
 
 from .file import create_dirs, load
-
+from anndata import AnnData
 
 class Results_Handler():
-    def __init__(self,path:str,splits:List,mc_flag:bool=False,read_ad:bool=False,run_name:str=None,save_results:bool=False) -> None:
+    def __init__(self,path:str,splits:List,mc_flag:bool=False,read_dataset:bool=False,run_name:str=None,save_results:bool=False) -> None:
         self.save_results = save_results
         self.all_splits = ['train','valid','test','ood','artificial','no_annotation']
         if splits == ['all']:
@@ -47,8 +47,10 @@ class Results_Handler():
                 self.run_name = '-'.join(self.run_name)
 
         ad_path = self.get_specific_hp_param(hp_param="dataset_path_train")
-        if read_ad:
-            self.ad = load(ad_path)
+        if read_dataset:
+            self.dataset = load(ad_path)
+            if isinstance(self.dataset,AnnData):
+                self.dataset = self.dataset.var
         
 
         self.seperate_label_from_split(split='artificial',removed_label='artificial_affix')
@@ -115,9 +117,9 @@ class Results_Handler():
     def append_loco_variants(self):
         train_classes = self.splits_df_dict["train_df"]["Logits"].columns.values
         if self.mc_flag:
-            all_loco_classes_df = self.ad.var['small_RNA_class_annotation'][self.ad.var['small_RNA_class_annotation_hico'].isnull()].str.split(';', expand=True)
+            all_loco_classes_df = self.dataset['small_RNA_class_annotation'][self.dataset['small_RNA_class_annotation_hico'].isnull()].str.split(';', expand=True)
         else:
-            all_loco_classes_df = self.ad.var['subclass_name'][self.ad.var['hico'].isnull()].str.split(';', expand=True)
+            all_loco_classes_df = self.dataset['subclass_name'][self.dataset['hico'].isnull()].str.split(';', expand=True)
 
         all_loco_classes = all_loco_classes_df.values
 

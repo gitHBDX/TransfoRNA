@@ -148,8 +148,8 @@ def plot_outliers(results,test_whisker_UB):
     test_ent = test_df["Entropy", "0"]
     #decompose outliers in ID
     outlier_seqs = test_df.iloc[(test_whisker_UB < test_ent).values]['RNA Sequences']['0'].values
-    outlier_seqs_in_ad = list(set(results.ad.var).intersection(set(outlier_seqs)))
-    major_class_dict = results.ad.var.loc[outlier_seqs_in_ad]['small_RNA_class_annotation'][~results.ad.var['hico'].isnull()].value_counts()
+    outlier_seqs_in_ad = list(set(results.dataset).intersection(set(outlier_seqs)))
+    major_class_dict = results.dataset.loc[outlier_seqs_in_ad]['small_RNA_class_annotation'][~results.dataset['hico'].isnull()].value_counts()
     major_class_dict = {x:y for x,y in major_class_dict.items() if y!=0}
     plt.pie(major_class_dict.values(),labels=major_class_dict.keys(),autopct='%1.1f%%')
     plt.axis('equal')
@@ -240,7 +240,7 @@ def compute_entropies(trained_on,model):
     run_name = None #if None, then the name of the model inputs will be used as the name
     #this could be for instance 'Sup Seq-Exp'
     ################################################################################################
-    results:Results_Handler = Results_Handler(path=path,splits=splits,read_ad=True,save_results=True)
+    results:Results_Handler = Results_Handler(path=path,splits=splits,read_dataset=True,save_results=True)
 
     results.append_loco_variants()
 

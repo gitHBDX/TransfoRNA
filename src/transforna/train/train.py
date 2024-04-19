@@ -13,6 +13,7 @@ from ..utils.utils import set_seed_and_device, sync_skorch_with_config,instantia
 from ..processing.splitter import *
 from ..novelty_prediction.id_vs_ood_nld_clf import compute_nlds
 from ..novelty_prediction.id_vs_ood_entropy_clf import compute_entropies
+from anndata import AnnData
 
 def compute_cv(cfg:DictConfig,path:str):
 
@@ -40,17 +41,20 @@ def train(cfg:Dict= None,path:str = None):
     #set seed
     set_seed_and_device(cfg["seed"],cfg["device_number"])
 
-    ad = load(cfg["train_config"].dataset_path_train)
+    dataset = load(cfg["train_config"].dataset_path_train)
+    
+    if isinstance(dataset,AnnData):
+        dataset = dataset.var
 
     #instantiate dataset class
     
     if cfg["task"] in ["premirna","sncrna"]:
-        tokenizer = SeqTokenizer(ad.var,cfg)
+        tokenizer = SeqTokenizer(dataset,cfg)
         test_data = load(cfg["train_config"].dataset_path_test)
         #prepare data for training and inference
         all_data = prepare_data_benchmark(tokenizer,test_data,cfg)
     else: 
-        df = DataAugmenter(ad.var,cfg).get_augmented_df()
+        df = DataAugmenter(dataset,cfg).get_augmented_df()
         tokenizer = SeqTokenizer(df,cfg)
         all_data = PrepareGeneData(tokenizer,cfg).prepare_data_tcga()
 

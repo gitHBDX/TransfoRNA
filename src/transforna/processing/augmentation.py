@@ -429,7 +429,7 @@ class DataAugmenter:
 
   
     def combine_df(self,new_var_df:pd.DataFrame):
-        #remove any sequences in augmented_df that exist in ad.var
+        #remove any sequences in augmented_df that exist in self.df.indexs
         duplicated_df = new_var_df[new_var_df.index.isin(self.df.index)]
         #log
         if len(duplicated_df):

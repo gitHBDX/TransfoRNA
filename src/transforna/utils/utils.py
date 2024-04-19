@@ -64,6 +64,38 @@ def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sc',trai
     inference_config = OmegaConf.merge({"train_config": train_config, "model_config": model_config}, inference_config)
     return inference_config
     
+def update_config_with_dataset_params_benchmark(train_data_df,configs):
+    '''
+    After tokenizing the dataset, some features in the config needs to be updated as they will be used 
+    later by sub modules
+    '''
+    # set feedforward input dimension and vocab size
+    #ss_tokens_id and tokens_id are the same
+    configs["model_config"].second_input_token_len = train_data_df["second_input"].shape[1]
+    configs["model_config"].tokens_len = train_data_df["tokens_id"].shape[1]
+    #set batch per epoch (number of batches). This will be used later by both the criterion and the LR
+    configs["train_config"].batch_per_epoch = train_data_df["tokens_id"].shape[0]/configs["train_config"].batch_size
+    return 
+
+def update_config_with_dataset_params_tcga(dataset_class,all_data_df,configs):
+    configs["model_config"].ff_input_dim = all_data_df['second_input'].shape[1]
+    configs["model_config"].vocab_size = len(dataset_class.seq_tokens_ids_dict.keys())
+    configs["model_config"].second_input_vocab_size = len(dataset_class.second_input_tokens_ids_dict.keys())
+    configs["model_config"].tokens_len = dataset_class.tokens_len
+    configs["model_config"].second_input_token_len = dataset_class.tokens_len
+
+    if configs["model_name"] == "seq-seq":
+        configs["model_config"].tokens_len = math.ceil(dataset_class.tokens_len/2)
+        configs["model_config"].second_input_token_len = math.ceil(dataset_class.tokens_len/2)
+    
+
+def update_dataclass_inference(cfg,dataset_class):
+    seq_token_dict,ss_token_dict = get_tokenization_dicts(cfg)
+    dataset_class.seq_tokens_ids_dict = seq_token_dict
+    dataset_class.second_input_tokens_ids_dict = ss_token_dict
+    dataset_class.tokens_len =cfg["model_config"].tokens_len
+    return dataset_class
+
 def set_seed_and_device(seed:int = 0,device_no:int=0):
     # set seed
     torch.backends.cudnn.deterministic = True
@@ -143,6 +175,13 @@ def revert_seq_tokenization(tokenized_seqs,configs):
         
         return pd.DataFrame(seqs_concat,columns=["Sequences"])
 
+def introduce_mismatches(seq, n_mismatches):
+    seq = list(seq)
+    for i in range(n_mismatches):
+        rand_nt = randint(0,len(seq)-1)
+        seq[rand_nt] = ['A','G','C','T'][randint(0,3)]
+    return ''.join(seq)
+
 def prepare_split(split_data_df,configs):
     '''
     This function returns tokens, token ids and labels for a given dataframes' split.
@@ -167,62 +206,19 @@ def prepare_split(split_data_df,configs):
     )
     return split_data, split_rna_seq, split_labels
 
-def get_add_test_set(dataset_class,dataset_path):
-    all_added_test_set = []
-    #get paths of all files in mirbase and mirgene
-    paths_mirbase = dataset_path+"mirbase/"
-    files_mirbase = os.listdir(paths_mirbase)
-    for f_idx,_ in enumerate(files_mirbase):
-        files_mirbase[f_idx] = paths_mirbase+files_mirbase[f_idx]
-    
-    paths_mirgene = dataset_path + "mirgene/"
-    files_mirgene = os.listdir(paths_mirgene)
-    for f_idx,_ in enumerate(files_mirgene):
-        files_mirgene[f_idx] = paths_mirgene+files_mirgene[f_idx]
-    files = files_mirbase+files_mirgene
-    for f in files:
-        #tokenize test set
-        test_pd = load(f)
-        test_pd = test_pd.drop(columns='Unnamed: 0')
-        test_pd["Sequences"] = test_pd["Sequences"].astype(object)
-        test_pd["Secondary"] = test_pd["Secondary"].astype(object)
-        #convert dataframe to anndata
-        test_pd["Labels"] = 1
+def prepare_model_inference(cfg,path):
+    # instantiate skorch model
+    net = instantiate_predictor(cfg["model"]["skorch_model"], cfg,path)
+    net.initialize()
+    net.load_params(f_params=f'{cfg["inference_settings"]["model_path"]}')
+    net.labels_mapping_dict = dict(zip(cfg["model_config"].class_mappings,list(np.arange(cfg["model_config"].num_classes))))
+    #save embeddings
+    if cfg['log_embedds']:
+        net.save_embedding=True
+        net.gene_embedds = []
+        net.second_input_embedds = []
+    return net
 
-        dataset_class.seqs_dot_bracket_labels = test_pd
-        dataset_class.limit_seqs_to_range()
-        all_added_test_set.append(dataset_class.get_tokenized_data())
-    return all_added_test_set
-
-def update_config_with_dataset_params_benchmark(train_data_df,configs):
-    '''
-    After tokenizing the dataset, some features in the config needs to be updated as they will be used 
-    later by sub modules
-    '''
-    # set feedforward input dimension and vocab size
-    #ss_tokens_id and tokens_id are the same
-    configs["model_config"].second_input_token_len = train_data_df["second_input"].shape[1]
-    configs["model_config"].tokens_len = train_data_df["tokens_id"].shape[1]
-    #set batch per epoch (number of batches). This will be used later by both the criterion and the LR
-    configs["train_config"].batch_per_epoch = train_data_df["tokens_id"].shape[0]/configs["train_config"].batch_size
-    return 
-
-def tokenize_set(dataset_class,test_ad,inference:bool=False):
-    test_ad.var["Secondary"] = test_ad.var["Secondary"].astype(object)
-    test_ad.var["Sequences"] = test_ad.var["Sequences"].astype(object)
-
-    #reassign the sequences to test
-    dataset_class.ad = test_ad
-    #prevent sequences with len < min lenght from being deleted
-    dataset_class.min_length = 0
-    dataset_class.limit_seqs_to_range()
-    return  dataset_class.get_tokenized_data(inference)
-
-def stratify(train_data,train_labels,valid_size):
-    return train_test_split(train_data, train_labels,
-                                                    stratify=train_labels, 
-                                                    test_size=valid_size)
- 
 def prepare_data_benchmark(tokenizer,test_ad, configs):
     """
     This function recieves anddata and prepares the anndata in a format suitable for training
@@ -291,65 +287,6 @@ def prepare_data_benchmark(tokenizer,test_ad, configs):
 
     return all_data
 
-def convert_pd_to_ad(data_pd,cfg):
-    #convert infer_data from pd to ad
-    infer_ad = anndata.AnnData(X= np.zeros((cfg["model_config"]["ff_input_dim"],len(data_pd.index))))
-    infer_ad.var["Sequences"]= data_pd["Sequences"].values
-    infer_ad.var["Secondary"] = data_pd["Secondary"].values
-    infer_ad.var["Labels"] = data_pd["Labels"].values
-    return infer_ad
-
-def get_inference_data(configs,dataset_class,all_data):
-
-    if configs["inference"]==True and configs["inference_settings"]["sequences_path"] is not None:
-        inference_file = configs["inference_settings"]["sequences_path"]
-        inference_path = Path(__file__).parent.parent.parent.absolute() / f"{inference_file}"
-
-        infer_data = load(inference_path)
-        #check if infer_data has secondary structure
-        if "Secondary" not in infer_data:
-            infer_data['Secondary'] = dataset_class.get_secondary_structure(infer_data["Sequences"])
-        if "Labels" not in infer_data:
-            infer_data["Labels"] = [0]*len(infer_data["Sequences"].values)
-        
-        dataset_class.seqs_dot_bracket_labels = infer_data
-
-
-        dataset_class.min_length = 0
-        dataset_class.limit_seqs_to_range()
-        infere_data_df = dataset_class.get_tokenized_data(inference=True)
-        infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,configs)
-
-        all_data["infere_data"] = infere_data
-        all_data["infere_rna_seq"] = infere_rna_seq
-
-def update_config_with_dataset_params_tcga(dataset_class,all_data_df,configs):
-    configs["model_config"].ff_input_dim = all_data_df['second_input'].shape[1]
-    configs["model_config"].vocab_size = len(dataset_class.seq_tokens_ids_dict.keys())
-    configs["model_config"].second_input_vocab_size = len(dataset_class.second_input_tokens_ids_dict.keys())
-    configs["model_config"].tokens_len = dataset_class.tokens_len
-    configs["model_config"].second_input_token_len = dataset_class.tokens_len
-
-    if configs["model_name"] == "seq-seq":
-        configs["model_config"].tokens_len = math.ceil(dataset_class.tokens_len/2)
-        configs["model_config"].second_input_token_len = math.ceil(dataset_class.tokens_len/2)
-    
-    '''
-    The expression profile has a length of 481. 
-    1 is ommitted, so 480 is the new expression profile length, this number is then divided by the num_embedd_hidden which in turn
-      deciedes the length of the token embedding on which Self attention would be applied; 480/30 = 16.
-      check forward function of RNATransformer
-    '''
-    if configs["model_name"] == "seq-exp":
-        configs["model_config"]["num_embed_hidden"] = 30 
-
-def introduce_mismatches(seq, n_mismatches):
-    seq = list(seq)
-    for i in range(n_mismatches):
-        rand_nt = randint(0,len(seq)-1)
-        seq[rand_nt] = ['A','G','C','T'][randint(0,3)]
-    return ''.join(seq)
-
 def prepare_inference_results_benchmarck(net,cfg,predicted_labels,logits,all_data):
     iterables = [["Sequences"], np.arange(1, dtype=int)]
     index = pd.MultiIndex.from_product(iterables, names=["type of data", "indices"])
@@ -403,6 +340,67 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
 
     return 
 
+def prepare_inference_data(cfg,ad,dataset_class):
+    #tokenize sequences
+    infere_data_df =   tokenize_set(dataset_class,ad,inference=True)
+    infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,cfg)
+
+    all_data = {}
+    all_data["infere_data"] = infere_data
+    all_data["infere_rna_seq"] = infere_rna_seq
+    return all_data
+
+def get_inference_data(configs,dataset_class,all_data):
+
+    if configs["inference"]==True and configs["inference_settings"]["sequences_path"] is not None:
+        inference_file = configs["inference_settings"]["sequences_path"]
+        inference_path = Path(__file__).parent.parent.parent.absolute() / f"{inference_file}"
+
+        infer_data = load(inference_path)
+        #check if infer_data has secondary structure
+        if "Secondary" not in infer_data:
+            infer_data['Secondary'] = dataset_class.get_secondary_structure(infer_data["Sequences"])
+        if "Labels" not in infer_data:
+            infer_data["Labels"] = [0]*len(infer_data["Sequences"].values)
+        
+        dataset_class.seqs_dot_bracket_labels = infer_data
+
+
+        dataset_class.min_length = 0
+        dataset_class.limit_seqs_to_range()
+        infere_data_df = dataset_class.get_tokenized_data(inference=True)
+        infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,configs)
+
+        all_data["infere_data"] = infere_data
+        all_data["infere_rna_seq"] = infere_rna_seq
+
+def get_add_test_set(dataset_class,dataset_path):
+    all_added_test_set = []
+    #get paths of all files in mirbase and mirgene
+    paths_mirbase = dataset_path+"mirbase/"
+    files_mirbase = os.listdir(paths_mirbase)
+    for f_idx,_ in enumerate(files_mirbase):
+        files_mirbase[f_idx] = paths_mirbase+files_mirbase[f_idx]
+    
+    paths_mirgene = dataset_path + "mirgene/"
+    files_mirgene = os.listdir(paths_mirgene)
+    for f_idx,_ in enumerate(files_mirgene):
+        files_mirgene[f_idx] = paths_mirgene+files_mirgene[f_idx]
+    files = files_mirbase+files_mirgene
+    for f in files:
+        #tokenize test set
+        test_pd = load(f)
+        test_pd = test_pd.drop(columns='Unnamed: 0')
+        test_pd["Sequences"] = test_pd["Sequences"].astype(object)
+        test_pd["Secondary"] = test_pd["Secondary"].astype(object)
+        #convert dataframe to anndata
+        test_pd["Labels"] = 1
+
+        dataset_class.seqs_dot_bracket_labels = test_pd
+        dataset_class.limit_seqs_to_range()
+        all_added_test_set.append(dataset_class.get_tokenized_data())
+    return all_added_test_set
+
 def get_tokenization_dicts(cfg):
     tokenization_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
     seq_token_dict = load(tokenization_path+'/seq_tokens_ids_dict')
@@ -419,44 +417,6 @@ def get_hp_setting(cfg,setting):
         model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
         return load(model_parent_path+'/meta/hp_settings')[setting]
 
-def add_ss_and_labels(infer_data):
-    #check if infer_data has secondary structure
-    if "Secondary" not in infer_data:
-        infer_data["Secondary"] = fold_sequences(infer_data["Sequences"].tolist())['structure_37'].values
-    if "Labels" not in infer_data:
-        infer_data["Labels"] = [0]*len(infer_data["Sequences"].values)
-    return infer_data
-
-def prepare_model_inference(cfg,path):
-    # instantiate skorch model
-    net = instantiate_predictor(cfg["model"]["skorch_model"], cfg,path)
-    net.initialize()
-    net.load_params(f_params=f'{cfg["inference_settings"]["model_path"]}')
-    net.labels_mapping_dict = dict(zip(cfg["model_config"].class_mappings,list(np.arange(cfg["model_config"].num_classes))))
-    #save embeddings
-    if cfg['log_embedds']:
-        net.save_embedding=True
-        net.gene_embedds = []
-        net.second_input_embedds = []
-    return net
-
-def update_dataclass_inference(cfg,dataset_class):
-    seq_token_dict,ss_token_dict = get_tokenization_dicts(cfg)
-    dataset_class.seq_tokens_ids_dict = seq_token_dict
-    dataset_class.second_input_tokens_ids_dict = ss_token_dict
-    dataset_class.tokens_len =cfg["model_config"].tokens_len
-    return dataset_class
-
-def prepare_inference_data(cfg,ad,dataset_class):
-    #tokenize sequences
-    infere_data_df =   tokenize_set(dataset_class,ad,inference=True)
-    infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,cfg)
-
-    all_data = {}
-    all_data["infere_data"] = infere_data
-    all_data["infere_rna_seq"] = infere_rna_seq
-    return all_data
-
 def get_model(cfg,path):
 
     cfg["model_config"] = get_hp_setting(cfg,'model_config')
@@ -467,6 +427,28 @@ def get_model(cfg,path):
     cfg['model_config']['model_input'] = cfg['model_name']
     net = prepare_model_inference(cfg,path)
     return cfg,net
+
+def stratify(train_data,train_labels,valid_size):
+    return train_test_split(train_data, train_labels,
+                                                    stratify=train_labels, 
+                                                    test_size=valid_size)
+ 
+def tokenize_set(dataset_class,test_pd,inference:bool=False):
+
+    #reassign the sequences to test
+    dataset_class.seqs_dot_bracket_labels = test_pd
+    #prevent sequences with len < min lenght from being deleted
+    dataset_class.min_length = 0
+    dataset_class.limit_seqs_to_range()
+    return  dataset_class.get_tokenized_data(inference)
+
+def add_ss_and_labels(infer_data):
+    #check if infer_data has secondary structure
+    if "Secondary" not in infer_data:
+        infer_data["Secondary"] = fold_sequences(infer_data["Sequences"].tolist())['structure_37'].values
+    if "Labels" not in infer_data:
+        infer_data["Labels"] = [0]*len(infer_data["Sequences"].values)
+    return infer_data
 
 def chunkstring_overlap(string, window):
         return (
@@ -497,18 +479,17 @@ def infer_from_pd(cfg,net,infer_pd,DataClass,attention_flag:bool=False):
     if len(infer_pd['Sequences'][infer_pd['Sequences'].str.len()>max_len].values)>0:
         infer_pd = create_short_seqs_from_long(infer_pd,max_len)
     infer_pd = add_ss_and_labels(infer_pd)
-    infer_ad = convert_pd_to_ad(infer_pd,cfg)
     if cfg['model_name'] == 'seq-seq':
         cfg['model_config']['tokens_len'] *=2 
         cfg['model_config']['second_input_token_len'] *=2 
         
         
     #create dataclass to tokenize infer sequences
-    dataset_class = DataClass(infer_ad.var,cfg)
+    dataset_class = DataClass(infer_pd,cfg)
     #update datasetclass with tokenization dicts and tokens_len
     dataset_class = update_dataclass_inference(cfg,dataset_class)
     #tokenize sequences
-    all_data = prepare_inference_data(cfg,infer_ad,dataset_class)
+    all_data = prepare_inference_data(cfg,infer_pd,dataset_class)
     
     #inference on custom data
     predicted_labels,logits,attn_scores_first_list,attn_scores_second_list = infer_from_model(net,all_data["infere_data"])  
@@ -530,7 +511,7 @@ def infer_from_pd(cfg,net,infer_pd,DataClass,attention_flag:bool=False):
         attn_scores_second_df.index = all_data['infere_rna_seq']['Sequences'].values
 
         attn_scores_df = attn_scores_first_df.join(attn_scores_second_df)
-        attn_scores_df['Secondary'] = infer_ad.var["Secondary"].values
+        attn_scores_df['Secondary'] = infer_pd["Secondary"].values
     else:
         attn_scores_df = None
     

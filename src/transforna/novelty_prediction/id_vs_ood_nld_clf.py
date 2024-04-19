@@ -232,7 +232,7 @@ def compute_nlds(trained_on,model):
     run_name = None #if None, then the name of the model inputs will be used as the name
     #this could be for instance 'Sup Seq-Exp'
     ################################################################################################
-    results:Results_Handler = Results_Handler(path=path,splits=splits,read_ad=True,save_results=True)
+    results:Results_Handler = Results_Handler(path=path,splits=splits,read_dataset=True,save_results=True)
     results.append_loco_variants()
     #get knn model
     results.get_knn_model()
