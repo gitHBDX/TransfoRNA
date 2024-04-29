@@ -1,20 +1,21 @@
+import os
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from sklearn.utils.class_weight import (compute_class_weight,
                                         compute_sample_weight)
-import torch
-import numpy as np
-import os
-from ..utils.file import load
-from sklearn.model_selection import train_test_split
-import pandas as pd
 from skorch.dataset import Dataset
 from skorch.helper import predefined_split
-from pathlib import Path
-from sklearn.preprocessing import LabelEncoder
-from ..utils.energy import fold_sequences
-from ..utils.file import save
-from ..utils.utils import update_config_with_dataset_params_benchmark,update_config_with_dataset_params_tcga,revert_seq_tokenization
-import math 
 
+from ..utils.energy import fold_sequences
+from ..utils.file import load, save
+from ..utils.utils import (revert_seq_tokenization,
+                           update_config_with_dataset_params_benchmark,
+                           update_config_with_dataset_params_tcga)
 
 
 class PrepareGeneData:

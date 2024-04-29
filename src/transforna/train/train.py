@@ -9,17 +9,19 @@ from ..processing.splitter import PrepareGeneData
 from ..score.score import (compute_score_benchmark, compute_score_tcga,
                            infere_additional_test_data)
 from ..utils.file import load, save
-from ..utils.utils import set_seed_and_device, sync_skorch_with_config,instantiate_predictor
+from ..utils.utils import set_seed_and_device, sync_skorch_with_config,instantiate_predictor,prepare_data_benchmark
 from ..processing.splitter import *
 from ..novelty_prediction.id_vs_ood_nld_clf import compute_nlds
 from ..novelty_prediction.id_vs_ood_entropy_clf import compute_entropies
 from anndata import AnnData
+import logging
+logger = logging.getLogger(__name__)
 
 def compute_cv(cfg:DictConfig,path:str):
 
     summary_pd = pd.DataFrame(index=np.arange(cfg["num_replicates"]),columns = ['B. Acc','Dur'])
     for seed_no in range(cfg["num_replicates"]):
-        print(f"Currently training replicate {seed_no}")
+        logger.info(f"Currently training replicate {seed_no}")
         cfg["seed"] = seed_no
         #only log embedds of the last replicate
         if seed_no == cfg["num_replicates"] - 1:
@@ -50,9 +52,9 @@ def train(cfg:Dict= None,path:str = None):
     
     if cfg["task"] in ["premirna","sncrna"]:
         tokenizer = SeqTokenizer(dataset,cfg)
-        test_data = load(cfg["train_config"].dataset_path_test)
+        test_ad = load(cfg["train_config"].dataset_path_test)
         #prepare data for training and inference
-        all_data = prepare_data_benchmark(tokenizer,test_data,cfg)
+        all_data = prepare_data_benchmark(tokenizer,test_ad,cfg)
     else: 
         df = DataAugmenter(dataset,cfg).get_augmented_df()
         tokenizer = SeqTokenizer(df,cfg)

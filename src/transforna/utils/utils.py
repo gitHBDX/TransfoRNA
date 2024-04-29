@@ -1,10 +1,11 @@
 
+import logging
 import math
 import os
 import random
 from pathlib import Path
 from random import randint
-from typing import  List
+from typing import List
 
 import anndata
 import numpy as np
@@ -30,8 +31,7 @@ from ..utils.tcga_post_analysis_utils import Results_Handler
 from .energy import *
 from .file import load
 
-
-
+logger = logging.getLogger(__name__)
 
 def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sc',trained_on:str = 'id',path_to_models:str = 'models/tcga/') -> DictConfig:
     inference_config = config.copy()
@@ -94,6 +94,8 @@ def update_dataclass_inference(cfg,dataset_class):
     dataset_class.seq_tokens_ids_dict = seq_token_dict
     dataset_class.second_input_tokens_ids_dict = ss_token_dict
     dataset_class.tokens_len =cfg["model_config"].tokens_len
+    dataset_class.max_length = get_hp_setting(cfg,'max_length')
+    dataset_class.min_length = get_hp_setting(cfg,'min_length')
     return dataset_class
 
 def set_seed_and_device(seed:int = 0,device_no:int=0):
@@ -233,7 +235,7 @@ def prepare_data_benchmark(tokenizer,test_ad, configs):
     update_config_with_dataset_params_benchmark(train_data_df,configs)
 
     ###tokenize test set
-    test_data_df = tokenize_set(tokenizer,test_ad)
+    test_data_df = tokenize_set(tokenizer,test_ad.var)
 
     ### get tokens(on device), seqs and labels(on device)
     train_data, train_rna_seq, train_labels =  prepare_split(train_data_df,configs)
@@ -340,9 +342,9 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
 
     return 
 
-def prepare_inference_data(cfg,ad,dataset_class):
+def prepare_inference_data(cfg,infer_pd,dataset_class):
     #tokenize sequences
-    infere_data_df =   tokenize_set(dataset_class,ad,inference=True)
+    infere_data_df = tokenize_set(dataset_class,infer_pd,inference=True)
     infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,cfg)
 
     all_data = {}
@@ -367,7 +369,7 @@ def get_inference_data(configs,dataset_class,all_data):
 
 
         dataset_class.min_length = 0
-        dataset_class.limit_seqs_to_range()
+        dataset_class.limit_seqs_to_range(logger)
         infere_data_df = dataset_class.get_tokenized_data(inference=True)
         infere_data,infere_rna_seq,_ = prepare_split(infere_data_df,configs)
 
@@ -407,15 +409,33 @@ def get_tokenization_dicts(cfg):
     ss_token_dict = load(tokenization_path+'/second_input_tokens_ids_dict')
     return seq_token_dict,ss_token_dict
 
-def get_hp_setting(cfg,setting):
+def get_hp_setting(cfg,hp_param):
     try:
         model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
-        return load(model_parent_path+'/meta/hp_settings')[setting]
+        hp_settings = load(model_parent_path+'/meta/hp_settings')
     except: 
         root_path = str(Path(__file__).parents[3])
         cfg['inference_settings']['model_path'] = root_path+'/'+cfg['inference_settings']['model_path']
+        
         model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
-        return load(model_parent_path+'/meta/hp_settings')[setting]
+        hp_settings =  load(model_parent_path+'/meta/hp_settings')
+
+    #hp_param could be in hp_settings .keyes or in a key of a key
+    hp_val = hp_settings.get(hp_param)
+    if not hp_val:
+        for key in hp_settings.keys():
+            if key == "model_config":
+                print(hp_settings[key])
+            try:
+                hp_val = hp_settings[key].get(hp_param)
+            except:
+                pass
+            if hp_val != None:
+                break
+    if hp_val == None:
+        raise ValueError(f"hp_param {hp_param} not found in hp_settings")
+
+    return hp_val
 
 def get_model(cfg,path):
 
@@ -434,11 +454,10 @@ def stratify(train_data,train_labels,valid_size):
                                                     test_size=valid_size)
  
 def tokenize_set(dataset_class,test_pd,inference:bool=False):
-
     #reassign the sequences to test
     dataset_class.seqs_dot_bracket_labels = test_pd
     #prevent sequences with len < min lenght from being deleted
-    dataset_class.min_length = 0
+    print(dataset_class.max_length)
     dataset_class.limit_seqs_to_range()
     return  dataset_class.get_tokenized_data(inference)
 

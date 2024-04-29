@@ -26,7 +26,7 @@ class GeneEmbeddModelConfig:
     # 200 is max rna length.
     # TODO: if tokenizer is overlap, then max_length should be 60
     # otherwise, will get cuda error, maybe dask can help
-    max_length: int = 60
+    max_length: int = 40
     tokens_len: int = math.ceil(max_length / window)
     second_input_token_len: int = 0 # is infered during runtime
     vocab_size: int = 0  # is infered during runtime

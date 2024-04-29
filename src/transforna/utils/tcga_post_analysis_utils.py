@@ -6,10 +6,11 @@ from typing import List
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from anndata import AnnData
 from sklearn.neighbors import NearestNeighbors
 
 from .file import create_dirs, load
-from anndata import AnnData
+
 
 class Results_Handler():
     def __init__(self,path:str,splits:List,mc_flag:bool=False,read_dataset:bool=False,run_name:str=None,save_results:bool=False) -> None:
@@ -37,16 +38,16 @@ class Results_Handler():
         create_dirs([self.figures_path,self.analysis_path,self.post_models_path])
 
         #get half of embedds cols if the model is Seq
-        model_name = self.get_specific_hp_param(hp_param="model_name")
+        model_name = self.get_hp_param(hp_param="model_name")
         if model_name == 'seq':
             self.embedds_cols = self.embedds_cols[:len(self.embedds_cols)//2]
 
         if not run_name:
-            self.run_name = self.get_specific_hp_param(hp_param="model_input")
+            self.run_name = self.get_hp_param(hp_param="model_input")
             if type(self.run_name) == list:
                 self.run_name = '-'.join(self.run_name)
 
-        ad_path = self.get_specific_hp_param(hp_param="dataset_path_train")
+        ad_path = self.get_hp_param(hp_param="dataset_path_train")
         if read_dataset:
             self.dataset = load(ad_path)
             if isinstance(self.dataset,AnnData):
@@ -60,7 +61,7 @@ class Results_Handler():
         self.sc_to_mc_mapper_dict = self.load_mc_mapping_dict()
 
         #get whether curr results are trained on ID or FULL
-        self.trained_on = self.get_specific_hp_param(hp_param="trained_on")
+        self.trained_on = self.get_hp_param(hp_param="trained_on")
         #the main config of models trained on ID is not logged as for FULL
         if self.trained_on == None:
             self.trained_on = 'id'
@@ -199,7 +200,7 @@ class Results_Handler():
             path = path[:-1]
         return path,split_dfs
 
-    def get_specific_hp_param(self,hp_param):
+    def get_hp_param(self,hp_param):
         hp_settings = load(path=self.meta_path+'/hp_settings')
         #hp_param could be in hp_settings .keyes or in a key of a key
         hp_val = hp_settings.get(hp_param)
@@ -209,15 +210,15 @@ class Results_Handler():
                     hp_val = hp_settings[key].get(hp_param)
                 except:
                     pass
-                if hp_val:
+                if hp_val != None:
                     break
-        if not hp_val:
+        if hp_val == None:
             raise ValueError(f"hp_param {hp_param} not found in hp_settings")
 
         return hp_val
 
     def load_mc_mapping_dict(self):
-        mapping_dict_path = self.get_specific_hp_param(hp_param="mapping_dict_path")
+        mapping_dict_path = self.get_hp_param(hp_param="mapping_dict_path")
 
         return load(mapping_dict_path)
 

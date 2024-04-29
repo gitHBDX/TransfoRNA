@@ -1,4 +1,5 @@
 
+import logging
 import math
 import random
 from typing import Dict, Optional
@@ -10,6 +11,7 @@ import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch.nn.modules.normalization import LayerNorm
 
+logger = logging.getLogger(__name__)
 
 def circulant_mask(n: int, window: int) -> torch.Tensor:
     """Calculate the relative attention mask, calculated once when model instatiated, as a subset of this matrix
@@ -430,7 +432,7 @@ class GeneEmbeddModel(nn.Module):
                 self.relu = nn.ReLU()
                 self.BN = nn.BatchNorm1d(num_nodes)
                 self.dropout = nn.Dropout(0.6)
-        print("number of parameters: %e", sum(p.numel() for p in self.parameters()))
+        logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
     def distort_input(self,x):
         for sample_idx in range(x.shape[0]):

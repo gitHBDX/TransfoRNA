@@ -1,17 +1,19 @@
 
-import os
+import logging
 import math
+import os
 import warnings
 from random import randint
 
 import numpy as np
 import pandas as pd
 from numpy.lib.stride_tricks import as_strided
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 
 from ..utils import energy
 from ..utils.file import save
 
+logger = logging.getLogger(__name__)
 
 class SeqTokenizer:
     '''
@@ -33,9 +35,14 @@ class SeqTokenizer:
         if config["train_config"].filter_seq_length:
             self.get_outlier_length_threshold()
             self.limit_seqs_to_range()
+
         else:
             self.max_length = self.seqs_dot_bracket_labels['Sequences'].str.len().max()
             self.min_length = 0
+
+        with open_dict(config):
+            config["model_config"]["max_length"] = np.int64(self.max_length).item()
+            config["model_config"]["min_length"] = np.int64(self.min_length).item()
         
         self.window = config["model_config"].window    
         self.tokens_len = math.ceil(self.max_length / self.window)
@@ -65,6 +72,7 @@ class SeqTokenizer:
         inlier_lengths = np.sort(lengths_arr[in_distribution].unique())
         self.max_length = int(np.max(inlier_lengths))
         self.min_length = int(np.min(inlier_lengths))
+        logger.info(f'maximum and minimum sequence length is set to: {self.max_length} and {self.min_length}')
         return 
     
 
@@ -74,21 +82,25 @@ class SeqTokenizer:
         '''
         df = self.seqs_dot_bracket_labels
         min_to_be_deleted = []
+
+        num_longer_seqs = sum(df['Sequences'].str.len()>self.max_length)
+        if num_longer_seqs:
+            #raise ValueError(f"Number of sequences longer than max length: {num_longer_seqs}")
+            print(f"Number of sequences to be trimmed: {num_longer_seqs}")
+
+
         for idx,seq in enumerate(df['Sequences']):
             if len(seq) > self.max_length:
                 df['Sequences'].iloc[idx] = \
                     df['Sequences'].iloc[idx][:self.max_length]
-                try:
-                    df['Secondary'].iloc[idx] = \
-                        df['Secondary'].iloc[idx][:self.max_length]
-                except:
-                    pass
+                
             elif len(seq) < self.min_length:
                 #deleted sequence indices
                 min_to_be_deleted.append(str(idx))
         #delete min sequences
         if len(min_to_be_deleted):
             df = df.drop(min_to_be_deleted).reset_index(drop=True)
+            logger.info(f"Number of sequences shroter sequences to be removed: {len(min_to_be_deleted)}")
         self.seqs_dot_bracket_labels = df
     
     def get_secondary_structure(self,sequences):
@@ -150,7 +162,7 @@ class SeqTokenizer:
                         self.seq_tokens_ids_dict[token] = id
                     else:
                         #if new token found during inference, then select random token (considered as noise)
-                        warnings.warn(f"The sequence token: {token} was not seen previously by the model. Token will be replaced by a random token")
+                        logger.warning(f"The sequence token: {token} was not seen previously by the model. Token will be replaced by a random token")
                         id = randint(1,len(self.seq_tokens_ids_dict.keys()) - 1)
                         token = self.seq_tokens_ids_dict[id]
                 # append id of token
@@ -254,7 +266,6 @@ class SeqTokenizer:
         
         return sample_token_ids,phase1
 
-
     def custom_roll(self,arr, n_shifts_per_row):
         '''
         shifts each row of a numpy array according to n_shifts_per_row
@@ -278,6 +289,10 @@ class SeqTokenizer:
     def get_tokenized_data(self,inference:bool=False):
         #tokenize sequences
         samples_tokenized,sample_token_ids = self.tokenize_samples(self.window,self.seq,inference)
+
+        print(f'Vocab size for primary sequences: {len(self.seq_tokens_ids_dict.keys())}')
+        print(f'Vocab size for secondary structure: {len(self.second_input_tokens_ids_dict.keys())}')
+        print(f'Number of sequences used for tokenization: {samples_tokenized.shape[0]}')
 
         #tokenize struct if used
         if "comp" in self.model_input:
@@ -311,7 +326,7 @@ class SeqTokenizer:
             self.second_input_tokens_ids_dict = self.seq_tokens_ids_dict
 
         #in case of baseline or only "seq", the second input is dummy
-        #TODO: major todo: refactor transforna to accept models with a single input (baseline and "seq") 
+        #TODO:: refactor transforna to accept models with a single input (baseline and "seq") 
         # without occupying unnecessary resources
         if "seq-rev" in self.model_input or "baseline" in self.model_input or self.model_input == 'seq':
             sample_token_ids_rev = sample_token_ids[:,::-1]
