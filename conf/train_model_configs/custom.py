@@ -1,8 +1,7 @@
 import math
 import os
 from dataclasses import dataclass, field
-from typing import List,Dict
-
+from typing import Dict, List
 
 dirname, _ = os.path.split(os.path.dirname(__file__))
 
@@ -73,11 +72,5 @@ class GeneEmbeddTrainConfig:
     num_augment_exp:int = 20
     shuffle_exp: bool = False
 
-    max_epochs: int  = 3
-    
-    freeze_flag:bool = False
+    max_epochs: int  = 3000
 
-    pretrain_epochs:int = 150
-    freeze_epoch:int = pretrain_epochs#int(0.5*max_epochs)
-
-    

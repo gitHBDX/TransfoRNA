@@ -145,7 +145,7 @@ class FeedForward1(nn.Module):
 
 
 class SharedInnerBlock(nn.Module):
-    def __init__(self, config: DictConfig, relative_attn: int,exp_flag:bool = False):
+    def __init__(self, config: DictConfig, relative_attn: int):
         super().__init__()
 
         self.config = config
@@ -303,7 +303,7 @@ class RNAFFrwd(
 
 
 class RNATransformer(nn.Module):
-    def __init__(self, model_config: DictConfig,exp_flag:bool=False):
+    def __init__(self, model_config: DictConfig):
         super().__init__()
         self.num_embedd_hidden = model_config.num_embed_hidden
         self.encoder = nn.Embedding(
@@ -316,7 +316,7 @@ class RNATransformer(nn.Module):
 
             self.transformer_layers = nn.ModuleList(
                 [
-                    SharedInnerBlock(model_config, int(window/model_config.window),exp_flag=exp_flag)
+                    SharedInnerBlock(model_config, int(window/model_config.window))
                     for window in model_config.relative_attns[
                         : model_config.num_encoder_layers
                     ]
@@ -328,23 +328,17 @@ class RNATransformer(nn.Module):
             self.rna_ffrwd = RNAFFrwd(model_config)
             self.pad_id = 0
 
-    def forward(self, x:torch.Tensor,exp_flag: bool=False) -> torch.Tensor:
+    def forward(self, x:torch.Tensor) -> torch.Tensor:
         if x.is_cuda:
             long_tensor = torch.cuda.LongTensor
         else:
             long_tensor = torch.LongTensor
             
-        if not exp_flag:
-            embedds = self.encoder(x)
+        embedds = self.encoder(x)
         if 'baseline' not in self.model_input:
-            if not exp_flag:
-                output = self.pos_encoder(embedds)
-                attention_mask = (x != self.pad_id).int()
-            else:
-                exp_profile_length = int(x.shape[1]/self.num_embedd_hidden)
-                output = x.reshape((x.shape[0],exp_profile_length,self.num_embedd_hidden))
-                attention_mask = torch.ones(size=(output.shape[0],output.shape[1])).type(long_tensor)
-
+            output = self.pos_encoder(embedds)
+            attention_mask = (x != self.pad_id).int()
+            
             for l in self.transformer_layers:
                 output,attn_scores = l(output, attention_mask)
             output = self.MHA(output)
@@ -353,34 +347,6 @@ class RNATransformer(nn.Module):
         else:
             embedds = torch.flatten(embedds,start_dim=1)
             return embedds,None
-            
-class GeneExpFeedForward(nn.Module):
-    def __init__(self, model_config: Dict):
-        super(GeneExpFeedForward, self).__init__()
-        self.ff_input_dim = model_config.ff_input_dim
-        self.ff_hidden_dim = model_config.ff_hidden_dim
-        current_dim = self.ff_input_dim
-        self.layers = nn.ModuleList()
-        for hdim in self.ff_hidden_dim:
-            self.layers.append(nn.Linear(current_dim, hdim))
-            self.layers.append(nn.LayerNorm(hdim))
-            current_dim = hdim
-        self.layers.append(nn.Linear(current_dim, model_config.num_embed_hidden))
-        self.orthogonal_initialization()
-
-    def orthogonal_initialization(self):
-        for layer in self.layers:
-            if isinstance(layer, nn.Linear):
-                torch.nn.init.orthogonal_(layer.weight)
-
-    def forward(self, x):
-        out = x
-        for layer in self.layers:
-            out = layer(out)
-            if isinstance(layer, nn.Linear):
-                out = F.relu(out)
-
-        return F.normalize(out, dim=1, p=2)
 
 class GeneEmbeddModel(nn.Module):
     def __init__(
@@ -406,10 +372,7 @@ class GeneEmbeddModel(nn.Module):
         #this differs between both models not the token_len/ss_token_len
         self.model_config.vocab_size = self.model_config.second_input_vocab_size 
 
-        if 'exp' not in self.model_input:
-            self.second_input_model = RNATransformer(self.model_config)
-        else:
-            self.second_input_model = RNATransformer(self.model_config,exp_flag=True)
+        self.second_input_model = RNATransformer(self.model_config)
 
         #num_transformers refers to using either one model or two in parallel
         self.num_transformers = 2
@@ -432,7 +395,9 @@ class GeneEmbeddModel(nn.Module):
                 self.relu = nn.ReLU()
                 self.BN = nn.BatchNorm1d(num_nodes)
                 self.dropout = nn.Dropout(0.6)
+
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
+
 
     def distort_input(self,x):
         for sample_idx in range(x.shape[0]):
@@ -463,15 +428,10 @@ class GeneEmbeddModel(nn.Module):
             x[:, : self.tokens_len].type(long_tensor)
         )
         attn_scores_second = None
-        if 'exp' not in self.model_input:
-            second_input_embedd,attn_scores_second = self.second_input_model(
+        second_input_embedd,attn_scores_second = self.second_input_model(
                     x[:, self.tokens_len :-1].type(long_tensor)
                 )
-        else:
-            second_input_embedd,attn_scores_second = self.second_input_model(
-                    x[:, self.tokens_len :-2].type(float_tensor)
-                    ,exp_flag=True
-                )
+
         #for tcga: if seq or baseline
         if self.num_transformers == 1:
             activations = self.final_clf_1(gene_embedd)

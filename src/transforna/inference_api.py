@@ -1,4 +1,5 @@
 
+import logging
 import warnings
 from argparse import ArgumentParser
 from contextlib import redirect_stdout
@@ -15,6 +16,7 @@ from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 from yaml.loader import SafeLoader
 
+from .novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
 from .processing.seq_tokenizer import SeqTokenizer
 from .utils.file import load
 from .utils.tcga_post_analysis_utils import Results_Handler
@@ -22,7 +24,7 @@ from .utils.utils import (get_model, infer_from_pd,
                           prepare_inference_results_tcga,
                           update_config_with_inference_params)
 
-from .novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore")
 
@@ -130,7 +132,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         results:Results_Handler = Results_Handler(path=embedds_path,splits=['train'])
         results.get_knn_model()
         lv_threshold = load(results.analysis_path+"/novelty_model_coef")["Threshold"]
-        print(f'computing levenstein distance for the inference set')
+        logger.info(f'computing levenstein distance for the inference set')
         #prepare infer split
         gene_embedds_df.columns = results.embedds_cols[:len(gene_embedds_df.columns)]
         #add index of gene_embedds_df to be a column with name results.seq_col
@@ -158,14 +160,14 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             sim_df = sim_df.sort_values(by=['Sequence','NLD'],ascending=[False,True])
             return sim_df
         
-        print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
+        logger.info(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
         #for every n_sim elements in the list, get the smallest levenstein distance 
         lv_dist_closest = [min(lev_dist[i:i+n_sim]) for i in range(0,len(lev_dist),n_sim)]
         infer_pd['Is Familiar?'] = [True if lv<lv_threshold else False for lv in lv_dist_closest]
 
         if umap_flag:
             #compute umap
-            print(f'computing umap for the inference set')
+            logger.info(f'computing umap for the inference set')
             gene_embedds_df = gene_embedds_df.drop(results.seq_col,axis=1)
             umap = UMAP(n_components=2,random_state=42)
             scaled_embedds = StandardScaler().fit_transform(gene_embedds_df.values)
@@ -179,7 +181,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         infer_pd['Novelty Threshold'] = lv_threshold
         infer_pd['NLD'] = lv_dist_closest
         infer_pd = infer_pd.round({"NLD": 2, "Novelty Threshold": 2})
-        print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
+        logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
 
 def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logits_flag: bool = False, attention_flag: bool = False,\
@@ -205,7 +207,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logi
     #print time
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("Before", current_time)
+    logger.info("Before", current_time)
     models = ["Baseline","Seq", "Seq-Seq", "Seq-Struct", "Seq-Rev"]
     if similarity_flag or embedds_flag: #remove baseline, takes long time
         models = ["Baseline","Seq", "Seq-Seq", "Seq-Struct", "Seq-Rev"]
@@ -213,7 +215,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logi
         models = ["Seq", "Seq-Struct", "Seq-Rev"]
     df = None
     for model in models:
-        print(model)
+        logger.info(model)
         df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_models = path_to_models)
         df_["Model"] = model
         df = pd.concat([df, df_], axis=0)
@@ -223,7 +225,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logi
     #print time after inference
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("After", current_time)
+    logger.info("After", current_time)
     return df
 
 

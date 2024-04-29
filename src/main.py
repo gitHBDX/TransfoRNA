@@ -1,29 +1,22 @@
+import logging
 import os
+import sys
 import warnings
-from dataclasses import asdict
 
 import hydra
+from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from transforna.inference_benchmark import infer_benchmark
 from transforna.inference_tcga import infer_tcga
 from transforna.train.train import compute_cv, train
-from hydra.core.hydra_config import HydraConfig
-import sys
-import logging
 
 warnings.filterwarnings("ignore")
 
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-# define handler and formatter
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
-# add formatter to handler
-handler.setFormatter(formatter)
-# add handler to logger
-logger.addHandler(handler)
+
 
 def add_config_to_sys_path():
     cfg = HydraConfig.get()

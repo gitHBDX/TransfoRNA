@@ -3,6 +3,7 @@
 #A script for classifying OOD vs HICO ID (test split). Generates results depicted in figure 4c
 
 import json
+import logging
 import sys
 from typing import List
 
@@ -20,6 +21,8 @@ from sklearn.model_selection import train_test_split
 
 from ..utils.file import load, save
 from ..utils.tcga_post_analysis_utils import Results_Handler
+
+logger = logging.getLogger(__name__)
 
 def get_lev_dist(seqs_a_list:List[str],seqs_b_list:List[str]):
     '''
@@ -174,10 +177,9 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
     replicates = 10
     show_figure: bool = False
     #print mean of lev_dist_id_set and lev_dist_ood_set and std
-    print(f'lev_dist_id_set mean is {np.mean(lev_dist_id_set)} and std is {np.std(lev_dist_id_set)}')
-    print(f'lev_dist_ood_set mean is {np.mean(lev_dist_ood_set)} and std is {np.std(lev_dist_ood_set)}')
+    #print(f'lev_dist_id_set mean is {np.mean(lev_dist_id_set)} and std is {np.std(lev_dist_id_set)}')
+    #print(f'lev_dist_ood_set mean is {np.mean(lev_dist_ood_set)} and std is {np.std(lev_dist_ood_set)}')
     for random_state in range(replicates):
-        print('random_state: ',random_state)
         #plot only for the last random seed
         if random_state == replicates-1:
             show_figure = True
@@ -188,8 +190,6 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
         ###logs
         if results.save_results:
             log_lev_params(mean_thresh,results.analysis_path)
-            print("Lev Distance Threshold: ",thresholds[-1])
-
         ###plots 
         auc_roc = compute_roc(test_labels,lr_probs,results,show_figure)
         f1_prc,auc_prc = compute_prc(test_labels,lr_probs,yhat,results,show_figure)
@@ -204,10 +204,10 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
     auc_prc_std = np.std(aucs_prc)
     f1_prc_score = sum(f1s_prc)/len(f1s_prc)
     f1_prc_std = np.std(f1s_prc)
-    print('\n')
-    print(f"auc roc is {auc_roc_score} +- {auc_roc_std}")
-    print(f"auc prc is {auc_prc_score} +- {auc_prc_std}")
-    print(f"f1 prc is {f1_prc_score} +- {f1_prc_std}")
+
+    logger.info(f"auc roc is {auc_roc_score} +- {auc_roc_std}")
+    logger.info(f"auc prc is {auc_prc_score} +- {auc_prc_std}")
+    logger.info(f"f1 prc is {f1_prc_score} +- {f1_prc_std}")
 
     novelty_clf_metrics = {"AUC ROC score": auc_roc_score,\
         "auc_roc_std": auc_roc_std,\
@@ -224,8 +224,9 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
     return sum(thresholds)/len(thresholds)
 
 
-def compute_nlds(trained_on,model):
+def compute_nlds():
     #######################################TO CONFIGURE#############################################
+    logger.info("Computing novelty clf metrics")
     path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','no_annotation']
     #run name

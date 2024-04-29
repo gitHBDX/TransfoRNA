@@ -48,9 +48,9 @@ class GeneEmbeddModelConfig:
 
 @dataclass
 class GeneEmbeddTrainConfig:
-    dataset_path_train: str = '/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/data/TCGA__ngs__miRNA_log2RPM-23.4.0.h5ad'
-    precursor_file_path: str = '/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/data/HBDxBase.csv'
-    mapping_dict_path: str = '/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/data/subclass_to_annotation.json'
+    dataset_path_train: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/TCGA__ngs__miRNA_log2RPM-24.04.0__var.csv'
+    precursor_file_path: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/HBDxBase.csv'
+    mapping_dict_path: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA//data/subclass_to_annotation.json'
     device: str = "cuda"
     l2_weight_decay: float = 0.05
     batch_size: int = 512
@@ -76,11 +76,6 @@ class GeneEmbeddTrainConfig:
     num_augment_exp:int = 20
     shuffle_exp: bool = False
 
-    max_epochs: int  = 10
-    
-    freeze_flag:bool = False
-
-    pretrain_epochs:int = 150
-    freeze_epoch:int = pretrain_epochs#int(0.5*max_epochs)
+    max_epochs: int  = 2000
 
     

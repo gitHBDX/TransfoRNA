@@ -86,7 +86,7 @@ class SeqTokenizer:
         num_longer_seqs = sum(df['Sequences'].str.len()>self.max_length)
         if num_longer_seqs:
             #raise ValueError(f"Number of sequences longer than max length: {num_longer_seqs}")
-            print(f"Number of sequences to be trimmed: {num_longer_seqs}")
+            logger.info(f"Number of sequences to be trimmed: {num_longer_seqs}")
 
 
         for idx,seq in enumerate(df['Sequences']):
@@ -290,9 +290,9 @@ class SeqTokenizer:
         #tokenize sequences
         samples_tokenized,sample_token_ids = self.tokenize_samples(self.window,self.seq,inference)
 
-        print(f'Vocab size for primary sequences: {len(self.seq_tokens_ids_dict.keys())}')
-        print(f'Vocab size for secondary structure: {len(self.second_input_tokens_ids_dict.keys())}')
-        print(f'Number of sequences used for tokenization: {samples_tokenized.shape[0]}')
+        logger.info(f'Vocab size for primary sequences: {len(self.seq_tokens_ids_dict.keys())}')
+        logger.info(f'Vocab size for secondary structure: {len(self.second_input_tokens_ids_dict.keys())}')
+        logger.info(f'Number of sequences used for tokenization: {samples_tokenized.shape[0]}')
 
         #tokenize struct if used
         if "comp" in self.model_input:

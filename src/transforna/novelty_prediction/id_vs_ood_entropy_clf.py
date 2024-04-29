@@ -2,6 +2,7 @@
 #%%
 #A script for classifying OOD vs HICO ID (test split). Generates results depicted in figure 4c
 import json
+import logging
 import sys
 
 import matplotlib.pyplot as plt
@@ -18,6 +19,7 @@ from sklearn.model_selection import train_test_split
 from transforna.utils.file import save
 from transforna.utils.tcga_post_analysis_utils import Results_Handler
 
+logger = logging.getLogger(__name__)
 
 def entropy_clf(results,random_state:int=1):
     #clf entropy is test vs ood if sub_class else vs loco_not_in_train
@@ -186,7 +188,6 @@ def compute_logits_clf_metrics(results):
     replicates = 10
     show_figure: bool = False
     for random_state in range(replicates):
-        print('random_state: ',random_state)
         #plot only for the last random seed
         if random_state == replicates-1:
             show_figure = True
@@ -195,9 +196,7 @@ def compute_logits_clf_metrics(results):
         ###logs
         if results.save_results:
             log_model_params(model,results.analysis_path)
-            print("Entropy threshold: ",model.threshold)
             compute_novelty_prediction_per_split(results,model)
-            print("Novelty computed")
         ###plots 
         auc_roc = compute_roc(test_labels,lr_probs,results,show_figure)
         f1_prc,auc_prc = compute_prc(test_labels,lr_probs,yhat,results,show_figure)
@@ -213,9 +212,9 @@ def compute_logits_clf_metrics(results):
     f1_prc_score = sum(f1s_prc)/len(f1s_prc)
     f1_prc_std = np.std(f1s_prc)
 
-    print(f"auc roc is {auc_roc_score} +- {auc_roc_std}")
-    print(f"auc prc is {auc_prc_score} +- {auc_prc_std}")
-    print(f"f1 prc is {f1_prc_score} +- {f1_prc_std}")
+    logger.info(f"auc roc is {auc_roc_score} +- {auc_roc_std}")
+    logger.info(f"auc prc is {auc_prc_score} +- {auc_prc_std}")
+    logger.info(f"f1 prc is {f1_prc_score} +- {f1_prc_std}")
 
     logits_clf_metrics = {"AUC ROC score": auc_roc_score,\
         "auc_roc_std": auc_roc_std,\
@@ -232,8 +231,9 @@ def compute_logits_clf_metrics(results):
     
 
 
-def compute_entropies(trained_on,model):
+def compute_entropies():
     #######################################TO CONFIGURE#############################################
+    logger.info(f"Computing entropy for ID vs OOD")
     path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','no_annotation']
     #run name

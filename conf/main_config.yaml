@@ -1,7 +1,9 @@
 defaults: 
   - model: transforna
   - inference_settings: default
-  
+  #- override /hydra/hydra_logging@_group_: none
+  - override hydra/job_logging: disabled
+
 task: tcga # tcga,sncrna or premirna or custom (for a custom dataset)
 
 
@@ -12,7 +14,7 @@ model_config:
   _target_: train_model_configs.${task}.GeneEmbeddModelConfig
 
 #train settings
-model_name: seq #seq, seq-seq, seq-struct, seq-reverse, seq-exp or baseline
+model_name: seq #seq, seq-seq, seq-struct, seq-reverse, or baseline
 trained_on: full #full or id
 inference: False   # True or False
 #if inference is true, should the logits be logged?
@@ -40,6 +42,7 @@ tensorboard: False  # True or False
 #  output_subdir: null  
 #  run:  
 #    dir: .
+
 
 
 

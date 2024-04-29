@@ -14,7 +14,6 @@ class LossFunction(nn.Module):
         self.train_config = main_config["train_config"]
         self.model_config = main_config["model_config"]
         self.batch_per_epoch = self.train_config.batch_per_epoch
-        self.pretrain_epochs = self.train_config.pretrain_epochs
         self.warm_up_annealing = (
             self.train_config.warmup_epoch * self.batch_per_epoch
         )

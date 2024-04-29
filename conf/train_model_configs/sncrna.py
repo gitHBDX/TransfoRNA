@@ -50,8 +50,6 @@ class GeneEmbeddTrainConfig:
     batch_per_epoch:int = 0 #will be infered later
     label_smoothing_sim:float = 0.0
     label_smoothing_clf:float = 0.0
-    #pretrain using CL for pretrain_epoch
-    pretrain_epochs: int = 1
 
     # learning rate
     learning_rate: float = 1e-3  # final learning rate ie 'lr annealed to'
@@ -70,5 +68,3 @@ class GeneEmbeddTrainConfig:
     filter_seq_length:bool = True
     train_epoch: int = 800
     max_epochs:int = 1000
-
-    freeze_flag:bool = False

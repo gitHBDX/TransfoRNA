@@ -1,20 +1,22 @@
+import logging
 from typing import Dict
 
+from anndata import AnnData
 from omegaconf import DictConfig, OmegaConf
 
 from ..callbacks.metrics import accuracy_score
+from ..novelty_prediction.id_vs_ood_entropy_clf import compute_entropies
+from ..novelty_prediction.id_vs_ood_nld_clf import compute_nlds
 from ..processing.augmentation import DataAugmenter
 from ..processing.seq_tokenizer import SeqTokenizer
+from ..processing.splitter import *
 from ..processing.splitter import PrepareGeneData
 from ..score.score import (compute_score_benchmark, compute_score_tcga,
                            infere_additional_test_data)
 from ..utils.file import load, save
-from ..utils.utils import set_seed_and_device, sync_skorch_with_config,instantiate_predictor,prepare_data_benchmark
-from ..processing.splitter import *
-from ..novelty_prediction.id_vs_ood_nld_clf import compute_nlds
-from ..novelty_prediction.id_vs_ood_entropy_clf import compute_entropies
-from anndata import AnnData
-import logging
+from ..utils.utils import (instantiate_predictor, prepare_data_benchmark,
+                           set_seed_and_device, sync_skorch_with_config)
+
 logger = logging.getLogger(__name__)
 
 def compute_cv(cfg:DictConfig,path:str):
@@ -47,6 +49,8 @@ def train(cfg:Dict= None,path:str = None):
     
     if isinstance(dataset,AnnData):
         dataset = dataset.var
+    else:
+        dataset.set_index('sequence',inplace=True)
 
     #instantiate dataset class
     
@@ -76,8 +80,8 @@ def train(cfg:Dict= None,path:str = None):
     #compute scores and log embedds
     if cfg['task'] == 'tcga':
         test_score = compute_score_tcga(net, all_data,path,cfg)
-        compute_nlds(cfg["trained_on"],cfg["model_name"])
-        compute_entropies(cfg["trained_on"],cfg["model_name"])
+        compute_nlds()
+        compute_entropies()
     else:
         test_score = compute_score_benchmark(net, path,all_data,accuracy_score,cfg)
     #only for premirna

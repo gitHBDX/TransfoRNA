@@ -7,13 +7,13 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
+from ..novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
 from ..utils.energy import fold_sequences
 from ..utils.file import load
 from ..utils.tcga_post_analysis_utils import Results_Handler
-from ..utils.utils import (get_model,
-                           infer_from_pd, prepare_inference_results_tcga,
+from ..utils.utils import (get_model, infer_from_pd,
+                           prepare_inference_results_tcga,
                            update_config_with_inference_params)
-from ..novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
 from .seq_tokenizer import SeqTokenizer
 
 
@@ -180,7 +180,6 @@ class PrecursorAugmenter:
     def load_precursor_file(self):
         try:
             precursor_df = pd.read_csv(self.config['train_config'].precursor_file_path, index_col=0)
-            precursor_df.loc[:,'precursor_bins'] = (precursor_df.precursor_length/25).astype(int)
             return precursor_df
         except:
             print('Could not load precursor file')
@@ -245,17 +244,16 @@ class PrecursorAugmenter:
 
     def get_precursor_info(self,mc:str,sc:str):
             
-        xRNA_df = self.precursor_df.loc[self.precursor_df.sRNA_class == mc]
+        xRNA_df = self.precursor_df.loc[self.precursor_df.small_RNA_class_annotation == mc]
         xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
         prec_name = sc.split('_bin-')[0]
-        bin_no = int(sc.split('_bin-')[1])
     
-        if mc in ['snoRNA','lncRNA','protein_coding']:
+        if mc in ['snoRNA','lncRNA','protein_coding','miscRNA']:
             prec_name = mc+'-'+prec_name
             prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
             #check if prec_row_df is empty
             if prec_row_df.empty:
-                xRNA_df = self.precursor_df.loc[self.precursor_df.sRNA_class == 'pseudo_'+mc]
+                xRNA_df = self.precursor_df.loc[self.precursor_df.small_RNA_class_annotation == 'pseudo_'+mc]
                 xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
                 prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
                 if prec_row_df.empty:
@@ -353,38 +351,38 @@ class PrecursorAugmenter:
     
     def populate_scs_with_bins(self):
         augmented_df = pd.DataFrame(columns=['Labels'])
-        try:
-            #append samples per sc for bin continuity
-            unique_labels = self.df.Labels.value_counts()[self.df.Labels.value_counts() >= self.min_num_samples_per_sc].index.tolist()
-            scs_list = []
-            scs_before = []
-            sc_after = []
-            for sc in unique_labels:
-                #retrieve_bin_from_precursor(other_sc_df,mapping_dict,sc)
-                if type(sc) == str and '_bin-' in sc:
-                    #get mc
-                    try:
-                        mc = self.mapping_dict[sc]
-                    except:
-                        sc_mc_mapper = lambda x: 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else None
-                        mc = sc_mc_mapper(sc)
-                        if mc is None:
-                            print(f'No mapping for {sc}')
-                            continue
-                    existing_seqs = self.df[self.df['Labels'] == sc].index
-                    scs_list.append(sc)
-                    scs_before.append(len(existing_seqs))
-                    #augment fragments from prev or consecutive bin
-                    precursor,prec_name = self.get_precursor_info(mc,sc)
-                    sc2_df = self.populate_from_bin(sc,precursor,prec_name,existing_seqs)
-                    augmented_df = augmented_df.append(sc2_df)
-                    sc_after.append(len(sc2_df))
-            #make a dict of scs and number of samples before and after augmentation
-            scs_dict = {'sc':scs_list,'before':scs_before,'after':sc_after}
-            scs_df = pd.DataFrame(scs_dict)
-            scs_df.to_csv(f'scs_{self.trained_on}_df.csv')
-        except:
-            print('Could not sample from precursors')
+
+        #append samples per sc for bin continuity
+        unique_labels = self.df.Labels.value_counts()[self.df.Labels.value_counts() >= self.min_num_samples_per_sc].index.tolist()
+        scs_list = []
+        scs_before = []
+        sc_after = []
+        for sc in unique_labels:
+            #retrieve_bin_from_precursor(other_sc_df,mapping_dict,sc)
+            if type(sc) == str and '_bin-' in sc:
+                #get mc
+                try:
+                    mc = self.mapping_dict[sc]
+                except:
+                    sc_mc_mapper = lambda x: 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else None
+                    mc = sc_mc_mapper(sc)
+                    if mc is None:
+                        print(f'No mapping for {sc}')
+                        continue
+                existing_seqs = self.df[self.df['Labels'] == sc].index
+                scs_list.append(sc)
+                scs_before.append(len(existing_seqs))
+                #augment fragments from prev or consecutive bin
+                precursor,prec_name = self.get_precursor_info(mc,sc)
+                sc2_df = self.populate_from_bin(sc,precursor,prec_name,existing_seqs)
+                augmented_df = augmented_df.append(sc2_df)
+                sc_after.append(len(sc2_df))
+        #make a dict of scs and number of samples before and after augmentation
+        scs_dict = {'sub_class':scs_list,'Number of samples before':scs_before,'Number of samples afrer':sc_after}
+        scs_df = pd.DataFrame(scs_dict)
+        scs_df.to_csv(f'frequency_per_sub_class_df.csv')
+
+
         return augmented_df
     
     def get_augmented_df(self):
@@ -422,6 +420,9 @@ class DataAugmenter:
             self.df['Labels'] = self.df['subclass_name'].str.split(';', expand=True)[0]
         else:
             self.df['Labels'] = self.df['subclass_name'][self.df['hico'] == True]
+        
+        self.df['Labels'] = self.df['Labels'].astype('category')
+
     
     def convert_to_major_class_labels(self):
         if self.clf_target == 'major_class':
@@ -433,7 +434,7 @@ class DataAugmenter:
         duplicated_df = new_var_df[new_var_df.index.isin(self.df.index)]
         #log
         if len(duplicated_df):
-            print(f'Number of duplicated sequences to be removed from ad: {duplicated_df.shape[0]}')
+            print(f'Number of duplicated sequences to be removed augmented data: {duplicated_df.shape[0]}')
 
         new_var_df = new_var_df[~new_var_df.index.isin(self.df.index)].sample(frac=1)
 
@@ -462,8 +463,8 @@ class DataAugmenter:
     def post_augmentation(self):
         random_df = self.random_augmenter.get_augmented_df()
         df = self.precursor_augmenter.get_augmented_df()
-        fusion_df = self.fusion_augmenter.get_augmented_df()
-        df = df.append(fusion_df).append(random_df)
+        recombined_df = self.fusion_augmenter.get_augmented_df()
+        df = df.append(recombined_df).append(random_df)
         self.df['Labels'] = self.df['Labels'].cat.add_categories({'random','recombined'})
         self.combine_df(df)
 

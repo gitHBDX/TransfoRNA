@@ -143,6 +143,10 @@ class PrepareGeneData:
         train_df,valid_test_df = train_test_split(data_df,stratify=data_df["Labels"],train_size=0.8,random_state=self.seed)
         valid_df,test_df = train_test_split(valid_test_df,stratify=valid_test_df["Labels"],train_size=0.5,random_state=self.seed)
 
+        #if trained_on == full, add valid and test to train to train on all data
+        if self.trained_on == 'full':
+            train_df = train_df.append(valid_df).append(test_df).reset_index(drop=True)
+
         self.splits_df_dict =  {"train_df":train_df,"valid_df":valid_df,"test_df":test_df,"artificial_df":artificial_df,"no_annotation_df":no_annotaton_df} | ood_dict
 
     def prepare_data_tcga(self):
@@ -185,73 +189,5 @@ class PrepareGeneData:
         return all_data
 
     
-    def prepare_data_benchmark(self):
-        """
-        This function recieves anddata and prepares the anndata in a format suitable for training
-        It also set default parameters in the config that cannot be known until preprocessing step
-        is done.
-        all_data_df is heirarchical pandas dataframe, so can be accessed  [AA,AT,..,AC ]
-        """
-        ###get tokenized train set
-        train_data_df = tokenizer.get_tokenized_data()
-        
-        ### update config with data specific params
-        update_config_with_dataset_params_benchmark(train_data_df,configs)
-
-        ###tokenize test set
-        test_data_df = tokenize_set(tokenizer,test_ad)
-
-        ### get tokens(on device), seqs and labels(on device)
-        train_data, train_rna_seq, train_labels =  prepare_split(train_data_df,configs)
-        test_data, test_rna_seq, test_labels =  prepare_split(test_data_df,configs)
-
-        class_weights = compute_class_weight(class_weight='balanced',classes=np.unique(train_labels.flatten()),y=train_labels.flatten().numpy())
-
-        
-        #omegaconfig does not support float64 as datatype so conversion to str is done 
-        # and reconversion is done in criterion
-        configs['model_config'].class_weights = [str(x) for x in list(class_weights)]
-
-        if configs["train_split"]:
-            #stratify train to get valid
-            train_data,valid_data,train_labels,valid_labels = stratify(train_data,train_labels,configs["valid_size"])
-            valid_ds = Dataset(valid_data,valid_labels)
-            valid_ds=predefined_split(valid_ds)
-        else:
-            valid_ds = None
-
-        all_data= {"train_data":train_data, 
-                "valid_ds":valid_ds,
-                "test_data":test_data, 
-                "train_rna_seq":train_rna_seq,
-                "test_rna_seq":test_rna_seq,
-                "train_labels_numeric":train_labels,
-                "test_labels_numeric":test_labels}
-
-        if configs["task"] == "premirna":
-            generalization_test_set = get_add_test_set(tokenizer,\
-                dataset_path=configs["train_config"].datset_path_additional_testset)
-        
-
-        #get all vocab from both test and train set
-        configs["model_config"].vocab_size = len(tokenizer.seq_tokens_ids_dict.keys())
-        configs["model_config"].second_input_vocab_size = len(tokenizer.second_input_tokens_ids_dict.keys())
-        configs["model_config"].tokens_mapping_dict = tokenizer.seq_tokens_ids_dict
-
-        
-        if configs["task"] == "premirna":
-            generalization_test_data = []
-            for test_df in generalization_test_set:
-                #no need to read the labels as they are all one
-                test_data_extra, _, _ =  prepare_split(test_df,configs)
-                generalization_test_data.append(test_data_extra)
-            all_data["additional_testset"] = generalization_test_data
-
-        #get inference dataset
-        # if do inference and inference datasert path exists
-        get_inference_data(configs,tokenizer,all_data)
-
-        return all_data
-
     
 
