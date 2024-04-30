@@ -241,7 +241,7 @@ class SeqTokenizer:
             sample_token_ids[seq_idx] = np.array(sample_token_ids[seq_idx])
             samples_tokenized[seq_idx] = np.array(samples_tokenized[seq_idx])
         # save vocab
-        return (samples_tokenized, sample_token_ids)
+        return (np.array(samples_tokenized), np.array(sample_token_ids))
     
     def set_class_attr(self):
         #set seq,struct and exp and labels

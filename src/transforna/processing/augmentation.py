@@ -91,7 +91,7 @@ class RecombinedSeqAugmenter:
         self.df = df
         self.config = config
         
-    def create_recombined_seqs(self,fusion_label:str='recombined'):
+    def create_recombined_seqs(self,class_label:str='recombined'):
         # one set of sequences should be generated 
         #1 - n real RNAs recombined together. n is the number of int(subclasses/2)
 
@@ -126,7 +126,7 @@ class RecombinedSeqAugmenter:
             random_seq = recombined_seq[max(0,recombined_index - random_half_len):recombined_index + random_half_len]
             recombined_set.append(random_seq)
 
-        recombined_df = pd.DataFrame(index=recombined_set, data=[f'{fusion_label}']*len(recombined_set)\
+        recombined_df = pd.DataFrame(index=recombined_set, data=[f'{class_label}']*len(recombined_set)\
             , columns =['Labels'])
 
         return recombined_df
@@ -410,7 +410,7 @@ class DataAugmenter:
 
         self.precursor_augmenter = PrecursorAugmenter(self.df,self.config)
         self.random_augmenter = RandomSeqAugmenter(self.df,self.config)
-        self.fusion_augmenter = RecombinedSeqAugmenter(self.df,self.config)
+        self.recombined_augmenter = RecombinedSeqAugmenter(self.df,self.config)
         self.id_model_augmenter = IDModelAugmenter(self.df,self.config)
 
 
@@ -463,7 +463,7 @@ class DataAugmenter:
     def post_augmentation(self):
         random_df = self.random_augmenter.get_augmented_df()
         df = self.precursor_augmenter.get_augmented_df()
-        recombined_df = self.fusion_augmenter.get_augmented_df()
+        recombined_df = self.recombined_augmenter.get_augmented_df()
         df = df.append(recombined_df).append(random_df)
         self.df['Labels'] = self.df['Labels'].cat.add_categories({'random','recombined'})
         self.combine_df(df)
