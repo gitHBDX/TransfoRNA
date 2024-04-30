@@ -422,8 +422,10 @@ class DataAugmenter:
 
     
     def convert_to_major_class_labels(self):
-        if self.clf_target == 'major_class':
+        if 'major_class' in self.clf_target:
             self.df['Labels'] = self.df['Labels'].map(self.mapping_dict).astype('category')
+            #remove multitarget major classes
+            self.df = self.df[~self.df['Labels'].str.contains(';').fillna(False)]
 
   
     def combine_df(self,new_var_df:pd.DataFrame):
