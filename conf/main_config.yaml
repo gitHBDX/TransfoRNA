@@ -15,7 +15,8 @@ model_config:
 
 #train settings
 model_name: seq #seq, seq-seq, seq-struct, seq-reverse, or baseline
-trained_on: full #full or id
+trained_on: id #full or id
+path_to_id_models: /nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/ #will be used if trained_on is full
 inference: False   # True or False
 #if inference is true, should the logits be logged?
 log_logits: False
@@ -38,10 +39,11 @@ log_embedds: True  # True or False
 tensorboard: False  # True or False
 
 #disable hydra output
-#hydra:  
+hydra:  
+  run:  
+    dir: ./outputs/${now:%Y-%m-%d}/${model_name}
 #  output_subdir: null  
-#  run:  
-#    dir: .
+
 
 
 

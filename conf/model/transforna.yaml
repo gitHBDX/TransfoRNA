@@ -1,7 +1,7 @@
 skorch_model:
-  _target_: transforna.model.skorchWrapper.Net
-  module: transforna.model.model_components.GeneEmbeddModel
-  criterion: transforna.callbacks.criterion.LossFunction
+  _target_: transforna.Net
+  module: transforna.GeneEmbeddModel
+  criterion: transforna.LossFunction
   max_epochs: 0 #infered from task specific train config
   optimizer: torch.optim.AdamW
   device: cuda
