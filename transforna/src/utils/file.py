@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import pickle
 from pathlib import Path
@@ -13,7 +14,7 @@ import pandas as pd
 import yaml
 from anndata import AnnData
 
-from .logger import warning
+logger = logging.getLogger(__name__)
 
 
 def create_dirs(paths:List):
@@ -104,7 +105,7 @@ def save(path: Path, data: object, ignore_ext: bool = False) -> Path:
             if "datetime" in data.obs[date_col].dtype.name:
                 data.obs[date_col] = data.obs[date_col].dt.strftime("%Y-%m-%d")
             else:
-                print(f"Column {date_col} in obs should be a date but isnt formatted as one.")
+                logger.info(f"Column {date_col} in obs should be a date but isnt formatted as one.")
         data.write(path)
     # Strings to normal files
     elif isinstance(data, str):
@@ -141,7 +142,8 @@ def _resolve_path(path: Path) -> Path:
     FileNotFoundError
         If the file doesn't exists or if there are multiple files that match the glob.
     """
-    path = path.expanduser().resolve()
+    if not path.name.startswith("/"):
+        path = path.expanduser().resolve()
 
     # If it exists we'll take it:
     if path.exists():

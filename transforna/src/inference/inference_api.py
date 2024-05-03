@@ -62,16 +62,12 @@ def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_id_mod
     transforna_folder = "TransfoRNA_ID"
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
-    if mc_or_sc == 'sc':
-        target = 'sub_class'
-    else:
-        target = 'major_class'
 
-    model_path = f"{path_to_id_models}/{transforna_folder}/{target}/{model}/meta/hp_settings.yaml"
+    model_path = f"{path_to_id_models}/{transforna_folder}/{mc_or_sc}/{model}/meta/hp_settings.yaml"
     cfg = OmegaConf.load(model_path)
     return cfg
 
-def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sc',\
+def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sub_class',\
                     logits_flag:bool = False,attention_flag:bool = False,\
                         similarity_flag:bool=False,n_sim:int=3,embedds_flag:bool = False, \
                             umap_flag:bool = False,trained_on:str='full',path_to_id_models:str='') -> pd.DataFrame:
@@ -184,7 +180,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
 
-def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logits_flag: bool = False, attention_flag: bool = False,\
+def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_class',logits_flag: bool = False, attention_flag: bool = False,\
         similarity_flag: bool = False, n_sim:int = 3,
         embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full",path_to_id_models:str='') -> pd.DataFrame:
     """
@@ -204,10 +200,8 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logi
     Output:
         df: dataframe with the predictions
     """
-    #print time
     now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    logger.info("Before", current_time)
+    before_time = now.strftime("%H:%M:%S")
     models = ["Baseline","Seq", "Seq-Seq", "Seq-Struct", "Seq-Rev"]
     if similarity_flag or embedds_flag: #remove baseline, takes long time
         models = ["Baseline","Seq", "Seq-Seq", "Seq-Struct", "Seq-Rev"]
@@ -222,10 +216,12 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sc',logi
     #aggregate ensemble model if not of the flags are true
     if not logits_flag and not attention_flag and not similarity_flag and not embedds_flag and not umap_flag:
         df = aggregate_ensemble_model(df)
-    #print time after inference
+
     now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
-    logger.info("After", current_time)
+    after_time = now.strftime("%H:%M:%S")
+    delta_time = datetime.strptime(after_time, "%H:%M:%S") - datetime.strptime(before_time, "%H:%M:%S")
+    logger.info(f"Time taken: {delta_time}")
+    
     return df
 
 

@@ -35,7 +35,7 @@ class GeneEmbeddModelConfig:
         "overlap"  # either overlap or no_overlap or overlap_multi_window
     )
 
-    clf_target:str = 'major_class_hico' # sub_class, major_class, sub_class_hico or major_class_hico. hico = high confidence
+    clf_target:str = 'sub_class_hico' # sub_class, major_class, sub_class_hico or major_class_hico. hico = high confidence
     num_classes: int = 0 #will be infered during runtime
     class_mappings:List = field(default_factory=lambda: [])#will be infered during runtime
     class_weights :List = field(default_factory=lambda: [])

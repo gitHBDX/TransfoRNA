@@ -2,7 +2,7 @@ defaults:
   - model: transforna
   - inference_settings: default
   #- override /hydra/hydra_logging@_group_: none
-  - override hydra/job_logging: disabled
+  - override hydra/job_logging: custom
 
 task: tcga # tcga,sncrna or premirna or custom (for a custom dataset)
 
@@ -42,6 +42,9 @@ tensorboard: False  # True or False
 hydra:  
   run:  
     dir: ./outputs/${now:%Y-%m-%d}/${model_name}
+  #./outputs2/
+  searchpath: 
+   - file:///nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/conf
 #  output_subdir: null  
 
 

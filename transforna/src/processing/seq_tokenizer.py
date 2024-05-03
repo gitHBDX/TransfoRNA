@@ -85,7 +85,6 @@ class SeqTokenizer:
 
         num_longer_seqs = sum(df['Sequences'].str.len()>self.max_length)
         if num_longer_seqs:
-            #raise ValueError(f"Number of sequences longer than max length: {num_longer_seqs}")
             logger.info(f"Number of sequences to be trimmed: {num_longer_seqs}")
 
 

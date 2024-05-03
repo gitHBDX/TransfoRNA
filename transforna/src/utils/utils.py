@@ -27,19 +27,15 @@ from .file import load
 
 logger = logging.getLogger(__name__)
 
-def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sc',trained_on:str = 'id',path_to_id_models:str = 'models/tcga/') -> DictConfig:
+def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sub_class',trained_on:str = 'id',path_to_id_models:str = 'models/tcga/') -> DictConfig:
     inference_config = config.copy()
     model = config['model_name']
     model = "-".join([word.capitalize() for word in model.split("-")])
     transforna_folder = "TransfoRNA_ID"
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
-    if mc_or_sc == 'sc':
-        target = 'sub_class'
-    else:
-        target = 'major_class'
 
-    inference_config['inference_settings']["model_path"] = f'{path_to_id_models}{transforna_folder}/{target}/{model}/ckpt/model_params_tcga.pt'
+    inference_config['inference_settings']["model_path"] = f'{path_to_id_models}{transforna_folder}/{mc_or_sc}/{model}/ckpt/model_params_tcga.pt'
     inference_config["inference"] = True
     inference_config["log_logits"] = False
 
@@ -161,7 +157,7 @@ def instantiate_predictor(skorch_cfg: DictConfig,cfg:DictConfig,path: str=None):
 def revert_seq_tokenization(tokenized_seqs,configs):
         window = configs["model_config"].window
         if configs["model_config"].tokenizer != "overlap":
-            print("Sequences are not reverse tokenized")
+            logger.error("Sequences are not reverse tokenized")
             return tokenized_seqs
         
         #currently only overlap tokenizer can be reverted
@@ -404,22 +400,13 @@ def get_tokenization_dicts(cfg):
     return seq_token_dict,ss_token_dict
 
 def get_hp_setting(cfg,hp_param):
-    try:
-        model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
-        hp_settings = load(model_parent_path+'/meta/hp_settings')
-    except: 
-        root_path = str(Path(__file__).parents[3])
-        cfg['inference_settings']['model_path'] = root_path+'/'+cfg['inference_settings']['model_path']
-        
-        model_parent_path='/'.join(cfg['inference_settings']['model_path'].split('/')[:-2])
-        hp_settings =  load(model_parent_path+'/meta/hp_settings')
-
+    model_parent_path=Path('/'.join(cfg['inference_settings']['model_path'].split('/')[:-2]))
+    hp_settings = load(model_parent_path/'meta/hp_settings.yaml')
+    
     #hp_param could be in hp_settings .keyes or in a key of a key
     hp_val = hp_settings.get(hp_param)
     if not hp_val:
         for key in hp_settings.keys():
-            if key == "model_config":
-                print(hp_settings[key])
             try:
                 hp_val = hp_settings[key].get(hp_param)
             except:
@@ -451,7 +438,6 @@ def tokenize_set(dataset_class,test_pd,inference:bool=False):
     #reassign the sequences to test
     dataset_class.seqs_dot_bracket_labels = test_pd
     #prevent sequences with len < min lenght from being deleted
-    print(dataset_class.max_length)
     dataset_class.limit_seqs_to_range()
     return  dataset_class.get_tokenized_data(inference)
 

@@ -1,3 +1,4 @@
+import logging
 import random
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -16,6 +17,7 @@ from ..utils.utils import (get_model, infer_from_pd,
                            update_config_with_inference_params)
 from .seq_tokenizer import SeqTokenizer
 
+logger = logging.getLogger(__name__)
 
 class IDModelAugmenter:
     '''
@@ -33,9 +35,11 @@ class IDModelAugmenter:
     def predict_transforna_na(self) -> Tuple:
         infer_pd = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
 
-        
-        inference_config = update_config_with_inference_params(self.config,path_to_id_models=self.config['path_to_id_models'])
-            
+        mc_or_sc = 'major_class' if 'major_class' in self.config['model_config'].clf_target else 'sub_class'
+        inference_config = update_config_with_inference_params(self.config,mc_or_sc=mc_or_sc,path_to_id_models=self.config['path_to_id_models'])
+        model_path = inference_config['inference_settings']["model_path"]
+        logger.info(f"Augmenting hico sequences based on predictions from model at: {model_path}")
+
         #path should be infer_cfg["model_path"] - 2 level + embedds
         embedds_path = '/'.join(inference_config['inference_settings']["model_path"].split('/')[:-2])+'/embedds'
         #read threshold
@@ -47,21 +51,21 @@ class IDModelAugmenter:
             root_dir = Path(__file__).parents[3].absolute()
             inference_config, net = get_model(inference_config, root_dir)
             infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-            print(f'predicting sub classes for the NA set by the ID models')
-            predicted_labels, logits,gene_embedds_df, attn_scores_pd,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, SeqTokenizer)
+            logger.info(f'predicting sub classes for the NA set by the ID models')
+            predicted_labels, logits,_, _,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, SeqTokenizer)
 
 
         prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
         infer_pd = all_data["infere_rna_seq"]
             
         #compute lev distance for embedds and 
-        print('computing levenstein distance for the NA set by the ID models')
+        logger.info('computing levenstein distance for the NA set by the ID models')
         _,_,_,_,_,lev_dist = get_closest_ngbr_per_split(results,'no_annotation')
             
-        print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
+        logger.info(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
         infer_pd['Is Familiar?'] = [True if lv<threshold else False for lv in lev_dist]
         infer_pd['Threshold'] = threshold
-        print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
+        logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
         
     def include_id_model_predictions(self):
@@ -72,8 +76,12 @@ class IDModelAugmenter:
 
         #get 'is familiar?' sequences
         familiar_seqs = pred_df[pred_df['Is Familiar?'] == True].Sequence.values
+        #get familiar seqs that exist in self.df
+        tcga_familiar_seqs = set(familiar_seqs).intersection(set(self.df.index))
+        #filter pred_df to only include tcga seqs
+        pred_df = pred_df[pred_df['Sequence'].isin(tcga_familiar_seqs)]
         #add new labels to df by selecting only the sequences that are not hico from df
-        self.df.loc[familiar_seqs,'Labels'] = pred_df[pred_df['Is Familiar?'] == True]['Net-Label'].values
+        self.df.loc[tcga_familiar_seqs,'Labels'] = pred_df[pred_df['Is Familiar?'] == True]['Net-Label'].values
 
     def get_augmented_df(self):
         self.include_id_model_predictions()
@@ -179,7 +187,7 @@ class PrecursorAugmenter:
             precursor_df = pd.read_csv(self.config['train_config'].precursor_file_path, index_col=0)
             return precursor_df
         except:
-            print('Could not load precursor file')
+            logger.info('Could not load precursor file')
             return None
         
     def compute_dynamic_bin_size(self,precursor_len:int, name:str=None) -> List[int]:
@@ -254,7 +262,7 @@ class PrecursorAugmenter:
                 xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
                 prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
                 if prec_row_df.empty:
-                    print(f'precursor {prec_name} not found in HBDxBase')
+                    logger.info(f'precursor {prec_name} not found in HBDxBase')
                     return pd.DataFrame()
     
             prec_row_df = prec_row_df.iloc[0]
@@ -364,7 +372,7 @@ class PrecursorAugmenter:
                     sc_mc_mapper = lambda x: 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else None
                     mc = sc_mc_mapper(sc)
                     if mc is None:
-                        print(f'No mapping for {sc}')
+                        logger.info(f'No mapping for {sc}')
                         continue
                 existing_seqs = self.df[self.df['Labels'] == sc].index
                 scs_list.append(sc)
@@ -403,6 +411,7 @@ class DataAugmenter:
         self.mapping_dict = load(config['train_config'].mapping_dict_path)
         self.trained_on = config.trained_on
         self.clf_target = config['model_config'].clf_target
+        logger.info(f'Augmenting the dataset for {self.clf_target}')
         self.set_labels()
 
         self.precursor_augmenter = PrecursorAugmenter(self.df,self.config)
@@ -433,7 +442,7 @@ class DataAugmenter:
         duplicated_df = new_var_df[new_var_df.index.isin(self.df.index)]
         #log
         if len(duplicated_df):
-            print(f'Number of duplicated sequences to be removed augmented data: {duplicated_df.shape[0]}')
+            logger.info(f'Number of duplicated sequences to be removed augmented data: {duplicated_df.shape[0]}')
 
         new_var_df = new_var_df[~new_var_df.index.isin(self.df.index)].sample(frac=1)
 
@@ -461,7 +470,11 @@ class DataAugmenter:
     
     def post_augmentation(self):
         random_df = self.random_augmenter.get_augmented_df()
-        df = self.precursor_augmenter.get_augmented_df()
+        #augmentation is only done for sub_class
+        if 'sub_class' in self.clf_target:
+            df = self.precursor_augmenter.get_augmented_df()
+        else:
+            df = pd.DataFrame()
         recombined_df = self.recombined_augmenter.get_augmented_df()
         df = df.append(recombined_df).append(random_df)
         self.df['Labels'] = self.df['Labels'].cat.add_categories({'random','recombined'})

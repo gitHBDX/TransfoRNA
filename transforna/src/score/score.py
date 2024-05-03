@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 from typing import Dict
@@ -11,6 +12,7 @@ from sklearn.metrics import confusion_matrix
 
 from ..utils.file import save
 
+logger = logging.getLogger(__name__)
 
 def load_pkl(name ):
     with open(name + '.pkl', 'rb') as f:
@@ -26,7 +28,7 @@ def infere_additional_test_data(net,data):
         predictions = net.predict(data[dataset_idx])
         correct = sum(torch.max(predictions,1).indices)
         total = len(torch.max(predictions,1).indices)
-        print(f'The prediction on the {dataset_idx} dataset is {correct} out of {total}')
+        logger.info(f'The prediction on the {dataset_idx} dataset is {correct} out of {total}')
 
 def get_rna_seqs(seq, model_config):
     rna_seqs = []
@@ -153,12 +155,12 @@ def get_split_score(net,split_data:torch.Tensor,split_labels:torch.Tensor,split:
     if split_labels is not None:
         split_score = sum(split_acc)/len(split_acc)
         if mirna_flag is not None:
-            print(f"{split} accuracy score is {split_score} for mirna: {mirna_flag}")
+            logger.info(f"{split} accuracy score is {split_score} for mirna: {mirna_flag}")
     else:
         #only for inference
         split_score = None
             
-        print(f"{split} accuracy score is {split_score}")
+        logger.info(f"{split} accuracy score is {split_score}")
     
     return split_score,predicted_labels_str
 
@@ -210,37 +212,14 @@ def generate_embedding(net, path:str,accuracy_sore,data, data_seq,labels,labels_
     score_avg = 0
     if split in ['train','valid','test']:
         score_avg = np.average(accuracy,weights = weights_per_batch)
-        print(f"total accuracy score on {split} is {np.round(score_avg,4)}")
+        logger.info(f"total accuracy score on {split} is {np.round(score_avg,4)}")
 
     
     if log_embedds:
-        print(f"logging embedds for {split}")
+        logger.debug(f"logging embedds for {split} set")
         save_embedds(net,path,data_seq,split,labels,model_config,logits)
 
     return score_avg
-
-
-
-def filter_augmented_exp(all_data):
-    '''
-    In this function the sequences in train_rna_seq are filtered for duplicates. The ids of the removed sequences are saved to be used 
-    to filter the corresponding sequences in train_data, train_labels and train_labels_numeric.
-    train_data, train_labels and train_labels_numeric are tensors and therefore the filtering is done by indexing.
-    '''
-    #get unique sequences
-    unique_seqs = all_data['train_rna_seq'].sort_index().groupby('Sequences').first().index.tolist()
-    #get duplicated sequences
-    duplicated_seqs = all_data['train_rna_seq'].sort_index().groupby('Sequences').filter(lambda x: len(x) > 1)
-    #print num duplicates
-    print(f'num of duplicated seqs to be removed: {len(duplicated_seqs)}')
-    #get unique sequences ids in train_data, train_labels and train_labels_numeric
-    unique_seqs_ids_in_data = [all_data['train_rna_seq'].iloc[all_data['train_rna_seq'].isin([seq]).values].index[0] for seq in unique_seqs]
-    #filter duplicated sequences in train_data, train_labels and train_labels_numeric
-    all_data['train_data'] = all_data['train_data'][unique_seqs_ids_in_data,:]
-    all_data['train_labels'] = all_data['train_labels'].iloc[unique_seqs_ids_in_data]
-    all_data['train_labels_numeric'] = all_data['train_labels_numeric'][unique_seqs_ids_in_data]
-    #filter duplicated sequences in train_rna_seq
-    all_data['train_rna_seq'] = all_data['train_rna_seq'].iloc[unique_seqs_ids_in_data]
 
 
 
@@ -264,8 +243,6 @@ def compute_score_tcga(
 
     splits = ['train','valid','test','ood','no_annotation','artificial']
 
-    #filter redundant seqs in case of seq-exp
-    filter_augmented_exp(all_data)
     test_score = 0
     #log all splits
     for split in splits:
@@ -280,7 +257,7 @@ def compute_score_tcga(
                 test_score = score
         except:
             trained_on = cfg['trained_on']
-            print(f'Skipping {split} split, as split does not exist for models trained on {trained_on}!')
+            logger.info(f'Skipping {split} split, as split does not exist for models trained on {trained_on}!')
             
         
             

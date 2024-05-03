@@ -3,21 +3,18 @@
 #A script for classifying OOD vs HICO ID (test split). Generates results depicted in figure 4c
 import json
 import logging
-import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from imblearn.under_sampling import RandomUnderSampler
-from matplotlib import pyplot
 from scipy.stats import entropy
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (auc, f1_score, precision_recall_curve,
-                             roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
 
 from ..utils.file import save
 from ..utils.tcga_post_analysis_utils import Results_Handler
+from .utlis import compute_prc, compute_roc
 
 logger = logging.getLogger(__name__)
 
@@ -47,62 +44,6 @@ def entropy_clf(results,random_state:int=1):
     yhat = model.predict(testX)
     return testy,lr_probs,yhat,model
 
-def compute_prc(test_labels,lr_probs,yhat,results,show_figure:bool=False):
-
-    lr_precision, lr_recall, _ = precision_recall_curve(test_labels, lr_probs)
-    lr_f1, lr_auc = f1_score(test_labels, yhat), auc(lr_recall, lr_precision)
-    # summarize scores
-    #print(f'{file}: f1=%.3f auc=%.3f' % (lr_f1, lr_auc))
-    # plot the precision-recall curves
-    if show_figure:
-        pyplot.plot(lr_recall, lr_precision, marker='.', label=results.figures_path.split('/')[-2])
-        # axis labels
-        pyplot.xlabel('Recall')
-        pyplot.ylabel('Precision')
-        # show the legend
-        pyplot.legend()
-    # save and show the plot
-    plt.title("PRC Curve")
-
-    if results.save_results:
-        plt.savefig(f"{results.figures_path}/prc_curve.png")
-        plt.savefig(f"{results.figures_path}/prc_curve.svg")
-
-    if show_figure:
-        plt.show()
-    return lr_f1,lr_auc
-
-def compute_roc(test_labels,lr_probs,results,show_figure:bool=False):
-    
-    ns_probs = [0 for _ in range(len(test_labels))]
-
-    # calculate scores
-    ns_auc = roc_auc_score(test_labels, ns_probs)
-    lr_auc = roc_auc_score(test_labels, lr_probs)
-    # summarize scores
-    #print(f'{file}: ROC AUC=%.3f' % (lr_auc))
-    # calculate roc curves
-    ns_fpr, ns_tpr, _ = roc_curve(test_labels, ns_probs)
-    lr_fpr, lr_tpr, _ = roc_curve(test_labels, lr_probs)
-
-    # plot the roc curve for the model
-    if show_figure:
-        plt.plot(lr_fpr, lr_tpr, marker='.',markersize=1, label=results.figures_path.split('/')[-2])
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        # show the legend
-        plt.legend()
-        plt.title("ROC Curve")
-
-    if results.save_results:
-        plt.savefig(f"{results.figures_path}/roc_curve.png")
-        plt.savefig(f"{results.figures_path}/roc_curve.svg")
-
-    if show_figure:    
-        plt.show()
-    return lr_auc
-
 def plot_entropy(results):
 
     entropies_list = []
@@ -124,9 +65,6 @@ def plot_entropy(results):
     plt.show()
     return [item.get_ydata()[1] for item in bx['whiskers']][2*test_idx+1]
 
-    
-
-
 def plot_entropy_per_unique_length(results,split):
     seqs_len = results.splits_df_dict[f"{split}_df"]["RNA Sequences",'0'].str.len().values
     index = results.splits_df_dict[f"{split}_df"]["RNA Sequences",'0'].values
@@ -143,7 +81,6 @@ def plot_entropy_per_unique_length(results,split):
     plt.show() 
     if results.save_results:
         plt.savefig(f"{results.figures_path}/{split}_entropy_per_length_boxplot.png")
-
 
 def plot_outliers(results,test_whisker_UB):
     test_df = results.splits_df_dict["test_df"]
@@ -179,7 +116,6 @@ def compute_novelty_prediction_per_split(results,model):
     #add noovelty prediction for all splits
     for split in results.splits:
         results.splits_df_dict[f'{split}_df']['Novelty Prediction','is_known_class'] = results.splits_df_dict[f'{split}_df']['Entropy','0']<= model.threshold
-    
 
 def compute_logits_clf_metrics(results):
     aucs_roc = []
@@ -228,12 +164,9 @@ def compute_logits_clf_metrics(results):
     if results.save_results:
         save(data = logits_clf_metrics,path=results.analysis_path+"/logits_clf_metrics.yaml")
 
-    
-
-
 def compute_entropies(embedds_path):
+    logger.info("Computing entropy for ID vs OOD:")
     #######################################TO CONFIGURE#############################################
-    logger.info(f"Computing entropy for ID vs OOD")
     #embedds_path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','no_annotation']
     #run name
@@ -258,11 +191,11 @@ def compute_entropies(embedds_path):
     compute_logits_clf_metrics(results)
 
     test_whisker_UB = plot_entropy(results)
-    print("plotting entropy per unique length")
+    logger.info("plotting entropy per unique length")
     plot_entropy_per_unique_length(results,'artificial_affix')
-    print('plotting entropy per unique length for ood')
+    logger.info('plotting entropy per unique length for ood')
     #decompose outliers in ID
-    print("plotting outliers")
+    logger.info("plotting outliers")
     plot_outliers(results,test_whisker_UB)
 
 

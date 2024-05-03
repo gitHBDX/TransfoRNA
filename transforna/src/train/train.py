@@ -25,11 +25,6 @@ def compute_cv(cfg:DictConfig,path:str,output_dir:str):
     for seed_no in range(cfg["num_replicates"]):
         logger.info(f"Currently training replicate {seed_no}")
         cfg["seed"] = seed_no
-        #only log embedds of the last replicate
-        if seed_no == cfg["num_replicates"] - 1:
-            cfg["log_embedds"] = True
-        else:
-            cfg["log_embedds"] = False
         test_score,net = train(cfg,path=path,output_dir=output_dir)                
         convrg_epoch = np.where(net.history[:,'val_acc_best'])[0][-1]
         convrg_dur = sum(net.history[:,'dur'][:convrg_epoch+1])
@@ -75,7 +70,7 @@ def train(cfg:Dict= None,path:str = None,output_dir:str = None):
     net.fit(all_data["train_data"],all_data["train_labels_numeric"],all_data["valid_ds"])
     
     #log train and model HP to curr run dir    
-    save(data=OmegaConf.to_container(cfg, resolve=True),path=path+'/meta/hp_settings')
+    save(data=OmegaConf.to_container(cfg, resolve=True),path=path+'/meta/hp_settings.yaml')
 
     #compute scores and log embedds
     if cfg['task'] == 'tcga':

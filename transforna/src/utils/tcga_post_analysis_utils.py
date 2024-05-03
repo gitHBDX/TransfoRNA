@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 from pathlib import Path
@@ -11,9 +12,9 @@ from sklearn.neighbors import NearestNeighbors
 
 from .file import create_dirs, load
 
-
+logger = logging.getLogger(__name__)
 class Results_Handler():
-    def __init__(self,embedds_path:str,splits:List,mc_flag:bool=False,read_dataset:bool=False,run_name:str=None,save_results:bool=False) -> None:
+    def __init__(self,embedds_path:str,splits:List,mc_flag:bool=False,read_dataset:bool=False,create_knn_graph:bool=False,run_name:str=None,save_results:bool=False) -> None:
         self.save_results = save_results
         self.all_splits = ['train','valid','test','ood','artificial','no_annotation']
         if splits == ['all']:
@@ -79,7 +80,7 @@ class Results_Handler():
         self.knn_labels = train_df[self.label_col].values
 
         #create knn model if does not exist
-        if not os.path.exists(self.post_models_path+'/knn_model.sav'):
+        if create_knn_graph:
             self.create_knn_model()
 
     def create_knn_model(self):
@@ -103,7 +104,7 @@ class Results_Handler():
     def seperate_label_from_split(self,split,removed_label:str='artificial_affix'):
         
         if split in self.splits:
-            print(f"splitting {removed_label} from split: {split}")
+            logger.debug(f"splitting {removed_label} from split: {split}")
 
 
             #get art affx
@@ -168,7 +169,7 @@ class Results_Handler():
         #ith run specifies the last run (-1), second last(-2)... etc 
         if not path:
             files = os.path.abspath(os.path.join(os.path.dirname( __file__ ), '../../..', 'outputs'))
-            print(files)
+            logging.debug(files)
             #newest
             paths = sorted(list(Path(files).rglob('')), key=lambda x: Path.stat(x).st_mtime, reverse=True)
             ith_run = abs(ith_run)
@@ -194,7 +195,7 @@ class Results_Handler():
 
             except:
                 splits_to_remove.append(split)
-                print(f'{split} does not exist in embedds! Removing it from splits')
+                logger.info(f'{split} does not exist in embedds! Removing it from splits')
         
         for split in splits_to_remove:
             self.splits.remove(split)
@@ -203,7 +204,7 @@ class Results_Handler():
         return path,split_dfs
 
     def get_hp_param(self,hp_param):
-        hp_settings = load(path=self.meta_path+'/hp_settings')
+        hp_settings = load(path=self.meta_path+'/hp_settings.yaml')
         #hp_param could be in hp_settings .keyes or in a key of a key
         hp_val = hp_settings.get(hp_param)
         if not hp_val:
@@ -233,7 +234,7 @@ class Results_Handler():
         sc.tl.pca(ad)
         sc.pp.neighbors(ad, n_neighbors=nn, n_pcs=None, use_rep="X_pca")
         sc.tl.umap(ad, n_components=2, spread=spread, min_dist=min_dist)
-        print(f'cords are: {ad.obsm}')
+        logger.info(f'cords are: {ad.obsm}')
         return ad
 
 

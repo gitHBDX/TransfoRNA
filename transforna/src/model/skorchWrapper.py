@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 
@@ -7,6 +8,7 @@ from skorch.dataset import Dataset, ValidSplit
 from skorch.setter import optimizer_setter
 from skorch.utils import is_dataset, to_device
 
+logger = logging.getLogger(__name__)
 #from ..tbWriter import writer
 
 
@@ -282,7 +284,7 @@ class Net(skorch.NeuralNet):
             msg = self._format_reinit_msg(
                 "optimizer", kwargs, triggered_directly=triggered_directly
             )
-            print(msg)
+            logger.info(msg)
 
         self.optimizer_ = self.optimizer(args, lr=kwargs["lr"])
 

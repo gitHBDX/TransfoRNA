@@ -8,7 +8,8 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-from src import compute_cv, infer_benchmark, infer_tcga, train
+
+from transforna import compute_cv, infer_benchmark, infer_tcga, train
 
 warnings.filterwarnings("ignore")
 
@@ -24,7 +25,7 @@ def add_config_to_sys_path():
 #transforna could called from anywhere:
 #python -m transforna --config-dir = /path/to/configs 
 @hydra.main(config_path='../conf', config_name="main_config")
-def my_app(cfg: DictConfig) -> None:
+def main(cfg: DictConfig) -> None:
     add_config_to_sys_path()
     #get path of hydra outputs folder
     output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
@@ -52,4 +53,4 @@ def my_app(cfg: DictConfig) -> None:
             train(cfg,path=path,output_dir=output_dir)
     
 if __name__ == "__main__":
-    my_app()
+    main()

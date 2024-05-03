@@ -13,7 +13,7 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3.9',
     ],
-    packages=find_packages(),
+    packages=find_packages(include=['transforna', 'transforna.*']),
     install_requires=[
         "anndata==0.8.0",
         "dill==0.3.6",

@@ -30,3 +30,4 @@ rm -rf dist TransfoRNA.egg-info
 # Reinstall TransfoRNA using pip
 python setup.py sdist
 pip install dist/TransfoRNA-0.0.1.tar.gz
+rm -rf TransfoRNA.egg-info dist

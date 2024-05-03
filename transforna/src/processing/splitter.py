@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from ..utils.utils import (revert_seq_tokenization,
                            update_config_with_dataset_params_benchmark,
                            update_config_with_dataset_params_tcga)
 
-
+logger = logging.getLogger(__name__)
 class PrepareGeneData:
     def __init__(self,tokenizer,configs):
         self.tokenizer = tokenizer
@@ -163,7 +164,7 @@ class PrepareGeneData:
         num_samples = self.splits_df_dict['train_df'].shape[0]
         num_classes = len(self.splits_df_dict['train_df'].Labels.value_counts()[self.splits_df_dict['train_df'].Labels.value_counts()>0])
         #log
-        print(f'Training with {num_classes} sub classes and {num_samples} samples')
+        logger.info(f'Training with {num_classes} classes and {num_samples} samples')
 
         #get features, labels, and seqs per split
         splits_features_dict = self.get_features_per_split()

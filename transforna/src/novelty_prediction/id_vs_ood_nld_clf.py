@@ -4,7 +4,6 @@
 
 import json
 import logging
-import sys
 from typing import List
 
 import matplotlib.pyplot as plt
@@ -13,14 +12,12 @@ import pandas as pd
 import plotly.express as px
 from imblearn.under_sampling import RandomUnderSampler
 from Levenshtein import distance
-from matplotlib import pyplot
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (auc, f1_score, precision_recall_curve,
-                             roc_auc_score, roc_curve)
 from sklearn.model_selection import train_test_split
 
 from ..utils.file import load, save
 from ..utils.tcga_post_analysis_utils import Results_Handler
+from .utlis import compute_prc, compute_roc
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +61,7 @@ def get_closest_ngbr_per_split(results:Results_Handler,split:str,num_neighbors:i
     '''
     split_df = results.splits_df_dict[f'{split}_df']
     #log
-    print(f'number of sequences in {split} is {split_df.shape[0]}')
+    logger.debug(f'number of sequences in {split} is {split_df.shape[0]}')
     #accomodate for multi-index df or single index
     try:
         split_seqs = split_df[results.seq_col].values[:,0]
@@ -89,62 +86,6 @@ def log_lev_params(threshold:float,analysis_path:str):
     model_params = {"Threshold": threshold}
     model_params = eval(json.dumps(model_params)) 
     save(data = model_params,path=analysis_path+"/novelty_model_coef.yaml")
-
-def compute_prc(test_labels,lr_probs,yhat,results,show_figure:bool=False):
-
-    lr_precision, lr_recall, _ = precision_recall_curve(test_labels, lr_probs)
-    lr_f1, lr_auc = f1_score(test_labels, yhat), auc(lr_recall, lr_precision)
-    # summarize scores
-    #print(f'{file}: f1=%.3f auc=%.3f' % (lr_f1, lr_auc))
-    # plot the precision-recall curves
-    if show_figure:
-        pyplot.plot(lr_recall, lr_precision, marker='.', label=results.figures_path.split('/')[-2])
-        # axis labels
-        pyplot.xlabel('Recall')
-        pyplot.ylabel('Precision')
-        # show the legend
-        pyplot.legend()
-    # save and show the plot
-    plt.title("PRC Curve")
-
-    if results.save_results:
-        plt.savefig(f"{results.figures_path}/prc_curve.png")
-        plt.savefig(f"{results.figures_path}/prc_curve.svg")
-
-    if show_figure:
-        plt.show()
-    return lr_f1,lr_auc
-
-def compute_roc(test_labels,lr_probs,results,show_figure:bool=False):
-    
-    ns_probs = [0 for _ in range(len(test_labels))]
-
-    # calculate scores
-    ns_auc = roc_auc_score(test_labels, ns_probs)
-    lr_auc = roc_auc_score(test_labels, lr_probs)
-    # summarize scores
-    #print(f'{file}: ROC AUC=%.3f' % (lr_auc))
-    # calculate roc curves
-    ns_fpr, ns_tpr, _ = roc_curve(test_labels, ns_probs)
-    lr_fpr, lr_tpr, _ = roc_curve(test_labels, lr_probs)
-
-    # plot the roc curve for the model
-    if show_figure:
-        plt.plot(lr_fpr, lr_tpr, marker='.',markersize=1, label=results.figures_path.split('/')[-2])
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        # show the legend
-        plt.legend()
-        plt.title("ROC Curve")
-
-    if results.save_results:
-        plt.savefig(f"{results.figures_path}/roc_curve.png")
-        plt.savefig(f"{results.figures_path}/roc_curve.svg")
-
-    if show_figure:    
-        plt.show()
-    return lr_auc
 
 def lev_clf(set_a,set_b,random_state):
     #get labels
@@ -176,9 +117,7 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
     thresholds = []
     replicates = 10
     show_figure: bool = False
-    #print mean of lev_dist_id_set and lev_dist_ood_set and std
-    #print(f'lev_dist_id_set mean is {np.mean(lev_dist_id_set)} and std is {np.std(lev_dist_id_set)}')
-    #print(f'lev_dist_ood_set mean is {np.mean(lev_dist_ood_set)} and std is {np.std(lev_dist_ood_set)}')
+
     for random_state in range(replicates):
         #plot only for the last random seed
         if random_state == replicates-1:
@@ -225,6 +164,7 @@ def compute_novelty_clf_metrics(results:Results_Handler,lev_dist_id_set,lev_dist
 
 
 def compute_nlds(embedds_path):
+    logger.info("Computing NLD metrics")
     #######################################TO CONFIGURE#############################################
     logger.info("Computing novelty clf metrics")
     #embedds_path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
@@ -233,7 +173,7 @@ def compute_nlds(embedds_path):
     run_name = None #if None, then the name of the model inputs will be used as the name
     #this could be for instance 'Sup Seq-Exp'
     ################################################################################################
-    results:Results_Handler = Results_Handler(embedds_path=embedds_path,splits=splits,read_dataset=True,save_results=True)
+    results:Results_Handler = Results_Handler(embedds_path=embedds_path,splits=splits,read_dataset=True,create_knn_graph=True,save_results=True)
     results.append_loco_variants()
     #get knn model
     results.get_knn_model()
