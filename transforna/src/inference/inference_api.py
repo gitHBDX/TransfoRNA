@@ -5,16 +5,14 @@ from argparse import ArgumentParser
 from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import pandas as pd
-import yaml
 from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from sklearn.preprocessing import StandardScaler
 from umap import UMAP
-from yaml.loader import SafeLoader
 
 from ..novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
 from ..processing.seq_tokenizer import SeqTokenizer
@@ -99,8 +97,9 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
 
     with redirect_stdout(None):
         cfg, net = get_model(cfg, root_dir)
-        infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net = infer_from_pd(cfg, net, infer_pd, SeqTokenizer,attention_flag)
+        #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
+        original_infer_pd = pd.Series(sequences, name="Sequences").to_frame()
+        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net, infer_pd = infer_from_pd(cfg, net, original_infer_pd, SeqTokenizer,attention_flag)
 
         if model == 'Seq':
             gene_embedds_df = gene_embedds_df.iloc[:,:int(gene_embedds_df.shape[1]/2)]

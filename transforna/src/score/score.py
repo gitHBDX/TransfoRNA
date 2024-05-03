@@ -87,7 +87,7 @@ def save_embedds(net,path:str,rna_seq,split:str='train',labels:pd.DataFrame=None
     save(data=final_csv,path =f'{path}{split}_embedds')
     
 
-def infer_from_model(net,split_data:torch.Tensor,log_split_str_labels:bool=False):
+def infer_from_model(net,split_data:torch.Tensor):
     batch_size = 100
     predicted_labels_str = []
     soft = nn.Softmax()

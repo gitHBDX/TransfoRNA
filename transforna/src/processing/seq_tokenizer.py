@@ -21,11 +21,12 @@ class SeqTokenizer:
     '''
     def __init__(self,seqs_dot_bracket_labels: pd.DataFrame, config: DictConfig):
 
-        self.seqs_dot_bracket_labels = seqs_dot_bracket_labels
+        self.seqs_dot_bracket_labels = seqs_dot_bracket_labels.reset_index(drop=True)
         #shuffle
-        self.seqs_dot_bracket_labels = self.seqs_dot_bracket_labels\
-            .sample(frac=1)\
-            .reset_index(drop=True)
+        if not config["inference"]:
+            self.seqs_dot_bracket_labels = self.seqs_dot_bracket_labels\
+                .sample(frac=1)\
+                .reset_index(drop=True)
         
         #get input of model
         self.model_input = config["model_config"].model_input

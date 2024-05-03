@@ -50,12 +50,13 @@ class IDModelAugmenter:
         with redirect_stdout(None):
             root_dir = Path(__file__).parents[3].absolute()
             inference_config, net = get_model(inference_config, root_dir)
-            infer_pd = pd.Series(sequences, name="Sequences").to_frame()
+            #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
+            original_infer_pd = pd.Series(sequences, name="Sequences").to_frame()
             logger.info(f'predicting sub classes for the NA set by the ID models')
-            predicted_labels, logits,_, _,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, SeqTokenizer)
+            predicted_labels, logits,_, _,all_data, max_len, net, infer_pd = infer_from_pd(inference_config, net, original_infer_pd, SeqTokenizer)
 
 
-        prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
+        prepare_inference_results_tcga(inference_config,predicted_labels, logits, all_data, max_len)
         infer_pd = all_data["infere_rna_seq"]
             
         #compute lev distance for embedds and 

@@ -202,6 +202,8 @@ def prepare_model_inference(cfg,path):
     # instantiate skorch model
     net = instantiate_predictor(cfg["model"]["skorch_model"], cfg,path)
     net.initialize()
+
+    logger.info(f"Model loaded from {cfg['inference_settings']['model_path']}")
     net.load_params(f_params=f'{cfg["inference_settings"]["model_path"]}')
     net.labels_mapping_dict = dict(zip(cfg["model_config"].class_mappings,list(np.arange(cfg["model_config"].num_classes))))
     #save embeddings
@@ -329,7 +331,6 @@ def prepare_inference_results_tcga(cfg,predicted_labels,logits,all_data,max_len)
        
     all_data["infere_rna_seq"].index.name = f'Sequences, Max Length={max_len}'
 
-
     return 
 
 def prepare_inference_data(cfg,infer_pd,dataset_class):
@@ -422,8 +423,6 @@ def get_model(cfg,path):
 
     cfg["model_config"] = get_hp_setting(cfg,'model_config')
 
-    #set seed and update skorch config
-    #set_seed_and_device(cfg["seed"],cfg["device_number"])
     sync_skorch_with_config(cfg["model"]["skorch_model"],cfg)
     cfg['model_config']['model_input'] = cfg['model_name']
     net = prepare_model_inference(cfg,path)
@@ -440,6 +439,13 @@ def tokenize_set(dataset_class,test_pd,inference:bool=False):
     #prevent sequences with len < min lenght from being deleted
     dataset_class.limit_seqs_to_range()
     return  dataset_class.get_tokenized_data(inference)
+
+def add_original_seqs_to_predictions(short_to_long_df,pred_df):
+    short_to_long_df.set_index('Sequences',inplace=True)
+    pred_df = pd.merge(pred_df,short_to_long_df[['Trimmed','Original_Sequence']],right_index=True,left_index=True,how='left')    
+    #filter repeated indexes
+    pred_df = pred_df[~pred_df.index.duplicated(keep='first')]  
+    return pred_df
 
 def add_ss_and_labels(infer_data):
     #check if infer_data has secondary structure
@@ -461,9 +467,20 @@ def create_short_seqs_from_long(df,max_len):
             chunkstring_overlap(feature, max_len)
             for feature in long_seqs
         )
-    seqs_shortend = [list(seq) for seq in feature_tokens_gen][0]
-    shortened_df = pd.DataFrame(data=seqs_shortend,columns=['Sequences'])
+    original_seqs = []
+    shortened_seqs = []
+    for i,feature_tokens in enumerate(feature_tokens_gen):
+        curr_trimmed_seqs = [feature for feature in feature_tokens]
+        shortened_seqs.extend(curr_trimmed_seqs)
+        original_seqs.extend([long_seqs[i]]*len(curr_trimmed_seqs))
+    short_to_long_dict = dict(zip(shortened_seqs,original_seqs))
+    shortened_df = pd.DataFrame(data=shortened_seqs,columns=['Sequences'])
     df = shortened_df.append(short_seqs_pd).reset_index(drop=True)
+    #add a column in df to indicate if the sequence was trimmed and another column to indicate the original sequence
+    df['Trimmed'] = False
+    df.loc[shortened_df.index,'Trimmed'] = True
+    df['Original_Sequence'] = df['Sequences']
+    df.loc[shortened_df.index,'Original_Sequence'] = df.loc[shortened_df.index,'Sequences'].map(short_to_long_dict)
     return df
 
 def infer_from_pd(cfg,net,infer_pd,DataClass,attention_flag:bool=False):
@@ -525,7 +542,7 @@ def infer_from_pd(cfg,net,infer_pd,DataClass,attention_flag:bool=False):
         gene_embedds_df.index = all_data['infere_rna_seq']['Sequences'].values
         gene_embedds_df.columns = ['gene_embedds_'+str(i) for i in range(gene_embedds_df.shape[1])]
 
-    return predicted_labels,logits,gene_embedds_df,attn_scores_df,all_data,max_len,net
+    return predicted_labels,logits,gene_embedds_df,attn_scores_df,all_data,max_len,net,infer_pd
 
 def log_embedds(cfg,net,seqs_df):
     gene_embedds = np.vstack(net.gene_embedds)
