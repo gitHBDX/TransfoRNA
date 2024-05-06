@@ -314,7 +314,7 @@ def load(path: str, ext: str = None, **kwargs):
         return yaml.load(open(path), Loader=yaml.SafeLoader)
     # AnnData
     elif ext == "h5ad":
-        ad = anndata.read_h5ad(path, **kwargs)
+        ad = anndata.read_h5ad(path)
         cast_anndata(ad)
         return ad
     # Excel files ⇒ DataFrame

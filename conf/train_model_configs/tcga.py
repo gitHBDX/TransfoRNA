@@ -76,6 +76,6 @@ class GeneEmbeddTrainConfig:
     num_augment_exp:int = 20
     shuffle_exp: bool = False
 
-    max_epochs: int  = 2
+    max_epochs: int  = 3000
 
     

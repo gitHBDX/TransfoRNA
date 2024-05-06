@@ -151,7 +151,7 @@ class PrepareGeneData:
             test_df = valid_test_df.drop_duplicates(subset=[('Labels',0)], keep="last")
             test_ids = valid_test_df.index.isin(test_df.index)
             valid_df = valid_test_df[~test_ids].reset_index(drop=True)
-            train_df = train_df.append(valid_df).append(test_df).reset_index(drop=True)
+            train_df = train_df.append(valid_df).reset_index(drop=True)
 
         self.splits_df_dict =  {"train_df":train_df,"valid_df":valid_df,"test_df":test_df,"artificial_df":artificial_df,"no_annotation_df":no_annotaton_df} | ood_dict
 

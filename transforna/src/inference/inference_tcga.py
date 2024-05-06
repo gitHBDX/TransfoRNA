@@ -1,6 +1,7 @@
 
-from pathlib import Path
 from typing import Dict
+
+from anndata import AnnData
 
 from ..processing.seq_tokenizer import SeqTokenizer
 from ..utils.file import load
@@ -13,6 +14,8 @@ def infer_tcga(cfg:Dict= None,path:str = None):
     cfg,net = get_model(cfg,path)
     inference_path = cfg['inference_settings']['sequences_path']
     original_infer_df = load(inference_path, index_col=0)
+    if isinstance(original_infer_df,AnnData):
+        original_infer_df = original_infer_df.var
     predicted_labels,logits,_,_,all_data,max_len,net,infer_df = infer_from_pd(cfg,net,original_infer_df,SeqTokenizer)
     
     #create inference_output if it does not exist
