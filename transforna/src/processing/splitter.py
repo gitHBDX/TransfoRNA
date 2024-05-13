@@ -17,6 +17,7 @@ from ..utils.file import load, save
 from ..utils.utils import (revert_seq_tokenization,
                            update_config_with_dataset_params_benchmark,
                            update_config_with_dataset_params_tcga)
+from anndata import AnnData
 
 logger = logging.getLogger(__name__)
 class PrepareGeneData:
@@ -113,9 +114,30 @@ class PrepareGeneData:
         return df
 
     def remove_fewer_samples(self,data_df):
-        counts = data_df['Labels'].value_counts()
-        fewer_class_ids = counts[counts < self.min_num_samples_per_class].index
-        fewer_class_labels = [i[0]  for i in fewer_class_ids]
+        if 'sub_class' in self.configs['model_config']['clf_target']:
+            counts = data_df['Labels'].value_counts()
+            fewer_class_ids = counts[counts < self.min_num_samples_per_class].index
+            fewer_class_labels = [i[0]  for i in fewer_class_ids]
+        elif 'major_class' in self.configs['model_config']['clf_target']:
+            #insure that major classes are the same as the one used when training for sub_class
+            #this is done for performance comparisons to be valid
+            #otherwise major class models would be trained on more major classes than sub_class models
+            tcga_df = load(self.configs['train_config'].dataset_path_train)
+            #only keep hico
+            tcga_df = tcga_df[tcga_df['hico'] == True]
+            if isinstance(tcga_df,AnnData):
+                tcga_df = tcga_df.var
+            #get subclass_name with samples higher than self.min_num_samples_per_class
+            counts = tcga_df['subclass_name'].value_counts()
+            all_subclasses = tcga_df['subclass_name'].unique()
+            selected_subclasses = counts[counts >= self.min_num_samples_per_class].index
+            #convert subclass_name to major_class
+            subclass_to_major_class_dict = load(self.configs['train_config'].mapping_dict_path)
+            all_major_classes = list(set([subclass_to_major_class_dict[sub_class]  for sub_class in all_subclasses]))
+            selected_major_classes = list(set([subclass_to_major_class_dict[sub_class] for sub_class in selected_subclasses]))
+            fewer_class_labels = list(set(all_major_classes) - set(selected_major_classes))
+
+        #remove samples with major_class not in major_classes
         fewer_samples_per_class_df = data_df.loc[data_df['Labels'].isin(fewer_class_labels).values, :]
         fewer_ids = data_df.index.isin(fewer_samples_per_class_df.index)
         data_df = data_df[~fewer_ids]
@@ -135,6 +157,7 @@ class PrepareGeneData:
         no_annotaton_df = no_annotaton_df.reset_index(drop=True)
 
         if self.trained_on == 'full':
+            #duplication is done to ensure as other wise train_test_split will fail
             data_df = self.duplicate_fewer_classes(data_df)
             ood_dict = {}
         else:

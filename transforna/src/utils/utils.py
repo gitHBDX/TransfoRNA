@@ -5,7 +5,6 @@ import os
 import random
 from pathlib import Path
 from random import randint
-from typing import List
 
 import numpy as np
 import pandas as pd
