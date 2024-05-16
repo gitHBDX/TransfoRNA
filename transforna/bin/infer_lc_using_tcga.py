@@ -4,20 +4,65 @@ from random import randint
 
 import pandas as pd
 import plotly.graph_objects as go
+from anndata import AnnData
+import math
+#add parent directory to path
+sys.path.append('/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/transforna/')
+from src import (Results_Handler, correct_labels, load, predict_transforna,
+                 predict_transforna_all_models)
 
-from transforna import (Results_Handler, correct_labels, load,
-                        predict_transforna, predict_transforna_all_models)
+def get_fused_seqs(seqs,num_sequences:int=1,max_len:int=30):
+    '''
+    fuse num_sequences sequences from seqs
+    '''
+    fused_seqs = []
+    while len(fused_seqs) < num_sequences:
+        #get two random sequences
+        seq1 = random.choice(seqs)[:max_len]
+        seq2 = random.choice(seqs)[:max_len]
+        
+        #select indeex to tuncate seq1 at between 60 to 70% of its length
+        idx = random.randint(math.floor(len(seq1)*0.3),math.floor(len(seq1)*0.7))
+        len_to_be_added_from_seq2 = len(seq1)-idx
+        #truncate seq1 at idx
+        seq1 = seq1[:idx]
+        #get the rest from the beg of seq2
+        seq2 = seq2[:len_to_be_added_from_seq2]
+        #fuse seq1 and seq2
+        fused_seq = seq1+seq2
 
+        if fused_seq not in fused_seqs and fused_seq not in seqs:
+            fused_seqs.append(fused_seq)
 
-def get_mc_sc(ad,sequences,sub_classes_used_for_training,sc_to_mc_mapper_dict,ood_flag = False):
+    return fused_seqs
 
-    infered_seqs_var = ad.var.loc[sequences]
-    sc_classes_df = infered_seqs_var['subclass_name'].str.split(';',expand=True)
+def get_mc_sc(infer_df,sequences,sub_classes_used_for_training,sc_to_mc_mapper_dict,ood_flag = False):
+
+    infered_seqs = infer_df.loc[sequences]
+    sc_classes_df = infered_seqs['subclass_name'].str.split(';',expand=True)
     #filter rows with all nans in sc_classes_df
     sc_classes_df = sc_classes_df[~sc_classes_df.isnull().all(axis=1)]
     #cmask for classes used for training
     if ood_flag:
-        mask = sc_classes_df.applymap(lambda x: True if x not in sub_classes_used_for_training or pd.isnull(x) else False)
+        sub_classes_used_for_training_plus_neighbors = []
+        #for every subclass in sub_classes_used_for_training that contains bin, get previous and succeeding bins
+        for sub_class in sub_classes_used_for_training:
+            sub_classes_used_for_training_plus_neighbors.append(sub_class)
+            if 'bin' in sub_class:
+                bin_num = int(sub_class.split('_bin-')[1])
+                if bin_num > 0:
+                    sub_classes_used_for_training_plus_neighbors.append(f'{sub_class.split("_bin-")[0]}_bin-{bin_num-1}')
+                sub_classes_used_for_training_plus_neighbors.append(f'{sub_class.split("_bin-")[0]}_bin-{bin_num+1}')
+            if 'tR' in sub_class:
+                #seperate the first part(either 3p/5p), also ge tthe second part after __
+                first_part = sub_class.split('-')[0]
+                second_part = sub_class.split('__')[1]
+                #get all classes in sc_to_mc_mapper_dict,values that contain both parts and append them to sub_classes_used_for_training_plus_neighbors
+                sub_classes_used_for_training_plus_neighbors += [sc for sc in sc_to_mc_mapper_dict.keys() if first_part in sc and second_part in sc]
+        sub_classes_used_for_training_plus_neighbors = list(set(sub_classes_used_for_training_plus_neighbors))
+        mask = sc_classes_df.applymap(lambda x: True if (x not in sub_classes_used_for_training_plus_neighbors and 'hypermapper' not in x)\
+                                                          or pd.isnull(x) else False)
+
     else:
         mask = sc_classes_df.applymap(lambda x: True if x in sub_classes_used_for_training or pd.isnull(x) else False)
     
@@ -32,11 +77,13 @@ def get_mc_sc(ad,sequences,sub_classes_used_for_training,sc_to_mc_mapper_dict,oo
     #filter rows with atleast one False in mask
     sc_classes_df = sc_classes_df[mask.apply(lambda x: all(x.tolist()), axis=1)]
     #get mc classes
-    mc_classes_df = sc_classes_df.applymap(lambda x: sc_to_mc_mapper_dict[x] if x in sc_to_mc_mapper_dict else x)
+    mc_classes_df = sc_classes_df.applymap(lambda x: sc_to_mc_mapper_dict[x] if x in sc_to_mc_mapper_dict else 'not_found')
     #assign major class for not found values if containing 'miRNA', 'tRNA', 'rRNA', 'snRNA', 'snoRNA'
     #mc_classes_df = mc_classes_df.applymap(lambda x: None if x is None else 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else 'not_found')
     #filter all 'not_found' rows
-    mc_classes_df = mc_classes_df[mc_classes_df.apply(lambda x: 'not_found' not in x.tolist(), axis=1)]
+    mc_classes_df = mc_classes_df[mc_classes_df.apply(lambda x: 'not_found' not in x.tolist() ,axis=1)]
+    #filter values with ; in mc_classes_df
+    mc_classes_df = mc_classes_df[~mc_classes_df[0].str.contains(';')]
     #filter index
     sc_classes_df = sc_classes_df.loc[mc_classes_df.index]
     mc_classes_df = mc_classes_df.loc[sc_classes_df.index]
@@ -88,7 +135,7 @@ def plot_confusion_false_novel(df,sc_df,mc_df,save_figs:bool=False):
     fig.update_yaxes(title_text='Actual mc class')
     #save
     if save_figs:
-        fig.write_image('bin/lc_figures/confusion_matrix_mc_classes_false_novel.png')
+        fig.write_image('transforna/bin/lc_figures/confusion_matrix_mc_classes_false_novel.png')
             
             
 def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers = False,fig_prefix:str = '',save_figs:bool=False):
@@ -96,7 +143,7 @@ def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers
     if fig_prefix == 'LC-familiar':
         font_size = 10
     #rename Labels to predicted_sc_labels
-    prediction_pd = prediction_pd.rename(columns={'Labels':'predicted_sc_labels'})
+    prediction_pd = prediction_pd.rename(columns={'Net-Label':'predicted_sc_labels'})
 
     for model in prediction_pd['Model'].unique():
         #get model predictions
@@ -108,11 +155,11 @@ def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers
 
         try: #try because ensemble models do not have a folder
             #check how many of the hico seqs exist in the train_df
-            embedds_path = f'/media/ftp_share/hbdx/analysis/tcga/TransfoRNA_I_FULL_V4/sub_class/{model}/embedds/'
-            results:Results_Handler = Results_Handler(path=embedds_path,splits=['train'])
+            embedds_path = f'/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/TransfoRNA_FULL/sub_class/{model}/embedds'
+            results:Results_Handler = Results_Handler(embedds_path=embedds_path,splits=['train'])
         except:
-            embedds_path = f'/media/ftp_share/hbdx/analysis/tcga/TransfoRNA_I_FULL_V4/sub_class/Seq-Rev/embedds/'
-            results:Results_Handler = Results_Handler(path=embedds_path,splits=['train'])
+            embedds_path = f'/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/TransfoRNA_FULL/sub_class/Seq-Rev/embedds'
+            results:Results_Handler = Results_Handler(embedds_path=embedds_path,splits=['train'])
             
         train_seqs = set(results.splits_df_dict['train_df']['RNA Sequences']['0'].values.tolist())
         common_seqs = train_seqs.intersection(set(model_prediction_pd.index.tolist()))
@@ -131,7 +178,7 @@ def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers
         fig_outl = mc_classes_df.loc[false_novel_df.index][0].value_counts().plot.pie(autopct='%1.1f%%',figsize=(6, 6))
         fig_outl.set_title(f'False Novel per MC for {model}: {num_outliers}')
         if save_figs:
-            fig_outl.get_figure().savefig(f'bin/lc_figures/false_novel_mc_{model}.png')
+            fig_outl.get_figure().savefig(f'transforna/bin/lc_figures/false_novel_mc_{model}.png')
             fig_outl.get_figure().clf()
         #get number of unique sub classes per major class in false_novel_df
         false_novel_sc_freq_df = sc_classes_df.loc[false_novel_df.index][0].value_counts().to_frame()
@@ -143,7 +190,7 @@ def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers
         fig_outl_sc = false_novel_sc_freq_df.groupby('MC')[0].sum().plot.pie(autopct='%1.1f%%',figsize=(6, 6))
         fig_outl_sc.set_title(f'False novel: No. Unique sub classes per MC {model}: {num_outliers}')
         if save_figs:
-            fig_outl_sc.get_figure().savefig(f'bin/lc_figures/{fig_prefix}_false_novel_sc_{model}.png')
+            fig_outl_sc.get_figure().savefig(f'transforna/bin/lc_figures/{fig_prefix}_false_novel_sc_{model}.png')
             fig_outl_sc.get_figure().clf()
             #filter outliers
         if seperate_outliers:
@@ -175,12 +222,12 @@ def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers
             #add a column indicating if NLD is greater than Novelty Threshold
             total_false_mc_predictions_df['is_novel'] = model_prediction_pd.loc[total_false_mc_predictions_df.index]['NLD'] > model_prediction_pd.loc[total_false_mc_predictions_df.index]['Novelty Threshold']
             #save
-            total_false_mc_predictions_df.to_csv(f'bin/lc_files/{fig_prefix}_total_false_mcs_w_out_{model}.csv')
+            total_false_mc_predictions_df.to_csv(f'transforna/bin/lc_files/{fig_prefix}_total_false_mcs_w_out_{model}.csv')
             total_true_mc_predictions_df = model_prediction_pd[model_prediction_pd.actual_mc_labels == model_prediction_pd.predicted_mc_labels].loc[:,cols_to_save]
             #add a column indicating if NLD is greater than Novelty Threshold
             total_true_mc_predictions_df['is_novel'] = model_prediction_pd.loc[total_true_mc_predictions_df.index]['NLD'] > model_prediction_pd.loc[total_true_mc_predictions_df.index]['Novelty Threshold']
             #save
-            total_true_mc_predictions_df.to_csv(f'bin/lc_files/{fig_prefix}_total_true_mcs_w_out_{model}.csv')
+            total_true_mc_predictions_df.to_csv(f'transforna/bin/lc_files/{fig_prefix}_total_true_mcs_w_out_{model}.csv')
 
         print('Model: ', model)
         print('num_outliers: ', num_outliers)
@@ -231,31 +278,28 @@ def compute_accuracy(prediction_pd,sc_classes_df,mc_classes_df,seperate_outliers
         if save_figs:
             #save plot
             if seperate_outliers:
-                fig.write_image(f'bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_no_out_' + model + '.png')
+                fig.write_image(f'transforna/bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_no_out_' + model + '.png')
                 #save svg
-                fig.write_image(f'bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_no_out_' + model + '.svg')
+                fig.write_image(f'transforna/bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_no_out_' + model + '.svg')
             else:
-                fig.write_image(f'bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_outliers_' + model + '.png')
+                fig.write_image(f'transforna/bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_outliers_' + model + '.png')
                 #save svg
-                fig.write_image(f'bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_outliers_' + model + '.svg')
+                fig.write_image(f'transforna/bin/lc_figures/{fig_prefix}_LC_confusion_matrix_mc_outliers_' + model + '.svg')
         print('\n')
 
 
 if __name__ == '__main__':
     #####################################################################################################################
     mapping_dict_path = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA//data/subclass_to_annotation.json'
-    #LC_path = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/TransfoRNA/compare_binning_strategies/v02/LC__ngs__DI_HB_GEL-23.1.2.h5ad'
-    LC_path = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/2024-05-02__240410_LC_DI_HB_GEL_v24.04.0x/ANNOTATION_DF.csv'
-    #LC_path = '/media/ftp_share/hbdx/analysis/data/LC_DI_HB_GEL/LC__ngs__DI_HB_GEL-23.1.1.h5ad'
-    #LC_path = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/TransfoRNA/compare_binning_strategies/v02/TCGA__ngs__miRNA_log2RPM-23.4.0.h5ad'
-    
+    LC_path = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/TransfoRNA/compare_binning_strategies/v05/2024-04-19__230126_LC_DI_HB_GEL_v23.01.00/sRNA_anno_aggregated_on_seq.csv'
+    path_to_models = '/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/'
     
     trained_on = 'full' #id or full
     save_figs = True
     
     infer_aa = infer_relaxed_mirna = infer_hico = infer_ood = infer_other_affixes = infer_random = infer_fused = infer_na = infer_loco = False
 
-    split = 'infer_relaxed_mirna'#sys.argv[1]
+    split = 'infer_hico'#sys.argv[1]
     print(f'Running inference for {split}')
     if split == 'infer_aa':
         infer_aa = True
@@ -301,11 +345,14 @@ if __name__ == '__main__':
     elif infer_loco:
         fig_prefix = 'LOCO'
 
-    ad = load(LC_path)
+    infer_df = load(LC_path)
+    if isinstance(infer_df,AnnData):
+        infer_df = infer_df.var
+    infer_df.set_index('sequence',inplace=True)
     sc_to_mc_mapper_dict = load(mapping_dict_path)
     #select hico sequences
-    hico_seqs = ad.var.index[ad.var['hico']].tolist()
-    art_affix_seqs = ad.var[~ad.var['five_prime_adapter_filter']].index.tolist()
+    hico_seqs = infer_df.index[infer_df['hico']].tolist()
+    art_affix_seqs = infer_df[~infer_df['five_prime_adapter_filter']].index.tolist()
     
     if infer_hico:
         hico_seqs = hico_seqs
@@ -314,24 +361,24 @@ if __name__ == '__main__':
         hico_seqs = art_affix_seqs
 
     if infer_other_affixes:
-        hico_seqs = ad.var[~ad.var['hbdx_spikein_affix_filter']].index.tolist()
+        hico_seqs = infer_df[~infer_df['hbdx_spikein_affix_filter']].index.tolist()
     
     if infer_na:
-        hico_seqs = ad.var[ad.var.subclass_name == 'no_annotation'].index.tolist()
+        hico_seqs = infer_df[infer_df.subclass_name == 'no_annotation'].index.tolist()
     
     if infer_loco:
-        hico_seqs = ad.var[~ad.var['hico']][ad.var.subclass_name != 'no_annotation'].index.tolist()
+        hico_seqs = infer_df[~infer_df['hico']][infer_df.subclass_name != 'no_annotation'].index.tolist()
 
     #for mirnas
     if infer_relaxed_mirna:
         #subclass name must contain miR, let, Let and not contain ; and that are not hico
-        mirnas_seqs = ad.var[ad.var.subclass_name.str.contains('miR') | ad.var.subclass_name.str.contains('let')][~ad.var.subclass_name.str.contains(';')].index.tolist()
-        #remove the ones that are true in ad.var.hico column
+        mirnas_seqs = infer_df[infer_df.subclass_name.str.contains('miR') | infer_df.subclass_name.str.contains('let')][~infer_df.subclass_name.str.contains(';')].index.tolist()
+        #remove the ones that are true in ad.hico column
         hico_seqs = list(set(mirnas_seqs).difference(set(hico_seqs)))
 
         #novel mirnas
-        #mirnas_not_in_train_mask = (ad.var['hico']==True).values *  ~(ad.var['subclass_name'].isin(mirna_train_sc)).values * (ad.var['small_RNA_class_annotation'].isin(['miRNA']))
-        #hicos = ad.var[mirnas_not_in_train_mask].index.tolist()
+        #mirnas_not_in_train_mask = (ad['hico']==True).values *  ~(ad['subclass_name'].isin(mirna_train_sc)).values * (ad['small_RNA_class_annotation'].isin(['miRNA']))
+        #hicos = ad[mirnas_not_in_train_mask].index.tolist()
 
     
     if infer_random:
@@ -347,16 +394,18 @@ if __name__ == '__main__':
         hico_seqs = get_fused_seqs(hico_seqs,num_sequences=200)
     
     
-    #hico_seqs = ad.var[ad.var.subclass_name.str.contains('mir')][~ad.var.subclass_name.str.contains(';')]['subclass_name'].index.tolist()
+    #hico_seqs = ad[ad.subclass_name.str.contains('mir')][~ad.subclass_name.str.contains(';')]['subclass_name'].index.tolist()
     hico_seqs = [seq for seq in hico_seqs if len(seq) <= 30]  
-     
+    #set cuda 1
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
     #run prediction
-    prediction_pd = predict_transforna_all_models(hico_seqs,trained_on=trained_on)
+    prediction_pd = predict_transforna_all_models(hico_seqs,trained_on=trained_on,path_to_id_models=path_to_models)
     prediction_pd['split'] = fig_prefix
     #the if condition here is to make sure to filter seqs with sub classes not used in training
     if not infer_ood and not infer_relaxed_mirna and not infer_hico:
-        prediction_pd.to_csv(f'bin/lc_files/{fig_prefix}_lev_dist_df.csv')
+        prediction_pd.to_csv(f'transforna/bin/lc_files/{fig_prefix}_lev_dist_df.csv')
     if infer_aa or infer_other_affixes or infer_random or infer_fused:
         for model in prediction_pd.Model.unique():
             num_non_novel = sum(prediction_pd[prediction_pd.Model == model]['Is Familiar?'])
@@ -373,11 +422,11 @@ if __name__ == '__main__':
                 print('\n')
         else:  
             #only to get classes used for training
-            prediction_single_pd = predict_transforna(hico_seqs[0],model='Seq',logits_flag = True,trained_on=trained_on)
+            prediction_single_pd = predict_transforna(hico_seqs[0],model='Seq',logits_flag = True,trained_on=trained_on,path_to_id_models=path_to_models)
             sub_classes_used_for_training = prediction_single_pd.columns.tolist()
         
 
-            mc_classes_df,sc_classes_df = get_mc_sc(ad,hico_seqs,sub_classes_used_for_training,sc_to_mc_mapper_dict,ood_flag=infer_ood)
+            mc_classes_df,sc_classes_df = get_mc_sc(infer_df,hico_seqs,sub_classes_used_for_training,sc_to_mc_mapper_dict,ood_flag=infer_ood)
             if infer_ood:
                 for model in prediction_pd.Model.unique():
                     #filter sequences in prediction_pd to only include sequences in sc_classes_df
@@ -406,7 +455,7 @@ if __name__ == '__main__':
             if infer_ood or infer_relaxed_mirna or infer_hico:
                 prediction_pd = prediction_pd[prediction_pd['Sequence'].isin(sc_classes_df.index)]
                 #save lev_dist_df
-                prediction_pd.to_csv(f'bin/lc_files/{fig_prefix}_lev_dist_df.csv')
+                prediction_pd.to_csv(f'transforna/bin/lc_files/{fig_prefix}_lev_dist_df.csv')
 
 
 

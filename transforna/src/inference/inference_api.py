@@ -98,19 +98,20 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     with redirect_stdout(None):
         cfg, net = get_model(cfg, root_dir)
         #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
-        original_infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net, infer_pd = infer_from_pd(cfg, net, original_infer_pd, SeqTokenizer,attention_flag)
+        infer_pd = pd.Series(sequences, name="Sequences").to_frame()
+        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net,_  = infer_from_pd(cfg, net, infer_pd, SeqTokenizer,attention_flag)
 
         if model == 'Seq':
             gene_embedds_df = gene_embedds_df.iloc[:,:int(gene_embedds_df.shape[1]/2)]
-
+    if logits_flag:
+        cfg['log_logits'] = True
     prepare_inference_results_tcga(cfg, predicted_labels, logits, all_data, max_len)
     infer_pd = all_data["infere_rna_seq"]
 
     if logits_flag:
         logits_df = infer_pd.rename_axis("Sequence").reset_index()
-        logits_cols = [col for col in logits_df.columns if "Logits" in col]
-        logits_df = logits_df[logits_cols]
+        logits_cols = [col for col in infer_pd.columns if "Logits" in col]
+        logits_df = infer_pd[logits_cols]
         logits_df.columns = pd.MultiIndex.from_tuples(logits_df.columns, names=["Logits", "Sub Class"])
         logits_df.columns = logits_df.columns.droplevel(0)
         return logits_df
