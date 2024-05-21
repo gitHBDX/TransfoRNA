@@ -153,6 +153,31 @@ def instantiate_predictor(skorch_cfg: DictConfig,cfg:DictConfig,path: str=None):
     net.initialized_=True
     return net
 
+def get_fused_seqs(seqs,num_sequences:int=1,max_len:int=30):
+    '''
+    fuse num_sequences sequences from seqs
+    '''
+    fused_seqs = []
+    while len(fused_seqs) < num_sequences:
+        #get two random sequences
+        seq1 = random.choice(seqs)[:max_len]
+        seq2 = random.choice(seqs)[:max_len]
+        
+        #select indeex to tuncate seq1 at between 60 to 70% of its length
+        idx = random.randint(math.floor(len(seq1)*0.3),math.floor(len(seq1)*0.7))
+        len_to_be_added_from_seq2 = len(seq1)-idx
+        #truncate seq1 at idx
+        seq1 = seq1[:idx]
+        #get the rest from the beg of seq2
+        seq2 = seq2[:len_to_be_added_from_seq2]
+        #fuse seq1 and seq2
+        fused_seq = seq1+seq2
+
+        if fused_seq not in fused_seqs and fused_seq not in seqs:
+            fused_seqs.append(fused_seq)
+
+    return fused_seqs
+
 def revert_seq_tokenization(tokenized_seqs,configs):
         window = configs["model_config"].window
         if configs["model_config"].tokenizer != "overlap":
