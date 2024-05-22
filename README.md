@@ -1,24 +1,23 @@
 # TransfoRNA
 TransfoRNA is a **bioinformatics** and **machine learning** tool based on **Transformers** to provide annotations for 11 major classes (miRNA, rRNA, tRNA, snoRNA, protein 
--coding/mRNA, lncRNA, YRNA, piRNA, snRNA, snoRNA and vtRNA) and 1225 sub-classes 
+-coding/mRNA, lncRNA, YRNA, piRNA, snRNA, snoRNA and vtRNA) and 1923 sub-classes 
 for **human small RNAs and RNA fragments**. These are typically detected by RNA-seq NGS (next generation sequencing) data.
 
-TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. 
-
+TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. Using TransfoRNA's framewok, the high confidence annotations in the TCGA dataset can be increased by 3 folds.
 
  
 ## Dataset (Objective):
-- **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs performance (classification of 278 sub-classes belonging to 11 major classes).
-  - Sequences are annotated based on a knowledge-based annotation approach that provides annotations for 1k+ different sub-classes.
+- **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs classification performance 
+  - Sequences are annotated based on a knowledge-based annotation approach that provides annotations for ~2k different sub-classes belonging to 11 major classes.
   - Knowledge-based annotations are divided into three sets of varying confidence levels: a **high-confidence (HICO)** set, a **low-confidence (LOCO)** set, and a **non-annotated (NA)** set for sequences that could not be annotated at all. Only HICO annotations are used for training.
-  - HICO RNAs cover 1225 sub-classes and constitute ~15.1% of all RNAs found in TCGA. LOCO and NA sets comprise 71.4% and 13.6% of RNAs, respectively.
-  - HICO RNAs are further divided into **in-distribution, ID** (278 sub-classes) and **out-of-distribution, OOD** (947 sub-classes) sets.
+  - HICO RNAs cover ~2k sub-classes and constitute 19.6% of all RNAs found in TCGA. LOCO and NA sets comprise 66.9% and 13.6% of RNAs, respectively.
+  - HICO RNAs are further divided into **in-distribution, ID** (374 sub-classes) and **out-of-distribution, OOD** (1549 sub-classes) sets.
     - Criteria for ID and OOD:  Sub-class containing more than 8 sequences are considered ID, otherwise OOD.
-  - An additional **putative 5' adapter affixes set** contains ~250 sequences known to be technical artefacts. The 5’-end perfectly matches the last five or more nucleotides of the 5’-adapter sequence, commonly used in small RNA sequencing.
+  - An additional **putative 5' adapter affixes set** contains 294 sequences known to be technical artefacts. The 5’-end perfectly matches the last five or more nucleotides of the 5’-adapter sequence, commonly used in small RNA sequencing.
   - The knowledge-based annotation (KBA) pipline including installation guide is located under `kba_pipline`
     
 ## Models
-There are 5 models currently available, each with different input encoders.
+There are 5 classifier models currently available, each with different input representation. 
  - Baseline: 
     - Input: (single input) Sequence
     - Model: An embedding layer that converts sequences into vectors followed by a classification feed forward layer.
@@ -35,6 +34,10 @@ There are 5 models currently available, each with different input encoders.
     - Input: (dual inputs) Sequence
     - Model: A transformer encoder for the sequence and another for the sequence reversed.
 
+
+*Note: These (Transformer) based models show overlapping and distinct capabilities. Consequently, an ensemble model is created to leverage those capabilities.*
+
+
 <img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
 
 ## Data Availability
@@ -48,83 +51,82 @@ This will download three subfolders that should be kept on the same folder level
 
   - `models`: 
     - `benchmark` : contains benchmark models trained on sncRNA and premiRNA data. (See additional datasets at the bottom)
-    - `tcga`: All models trained on the TCGA data; either for testing and validation `TransfoRNA_ID` or the production version `TransfoRNA_FULL` which contains  higher RNA major and sub-class coverage. Models trained on major-class and sub-class exist seperately in their respective folders.
+    - `tcga`: All models trained on the TCGA data; `TransfoRNA_ID` (for testing and validation) and `TransfoRNA_FULL` (the production version) containing  higher RNA major and sub-class coverage. Each of the two folders contain all the models trained seperately on major-class and sub-class.
   - `kba_pipeline`: contains mapping reference data required to run the knowledge based pipeline manually
 ## Repo Structure
 - configs: Contains the configurations of each model, training and inference settings.
  
-  The `configs/main_config.yaml` file offers options to change the task, the training settings and the logging. The following shows all the options and permitted values for each option.
+  The `conf/main_config.yaml` file offers options to change the task, the training settings and the logging. The following shows all the options and permitted values for each option.
 
-   <img width="566" alt="Screenshot 2023-08-17 at 13 43 15" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/bd1cdac5-f1d3-45fb-8543-5c2292a2542f">
+  <img width="835" alt="Screenshot 2024-05-22 at 10 19 15" src="https://github.com/gitHBDX/TransfoRNA/assets/82571392/225d2c98-ed45-4ca7-9e86-557a73af702d">
 
-- [tcga scripts](https://github.com/gitHBDX/TransfoRNA/blob/master/tcga_scripts/readme.md) are scripts that offer various detailed analyses on TCGA.
-
-- transforna
-    - Contains the transforna package which includes data preprocessing, splitting, model training and results logging. 
-    - An abstract [schematic](https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/readme.md) shows how TransfoRNA modules communicate during a training run.
+- transforna contains two folders:
+    - `src` folder which contains transforna package. View transforna's architecture here.
+    - `bin` folder contains all scripts necessary for reproducing manuscript figures.
 
 ## Installation
 
- The `environment.yml` includes all the required packages for TransfoRNA installation. Edit the `prefix` key to point to the conda folder, then run:
+ The `install.sh` is a script that creates an transforna environment in which all the required packages for TransfoRNA are installed. Simply navigate to the root directory and run from terminal:
  
  ```
- #update
- conda update -n base -c conda-forge conda
+ #make install script executable
+ chmod +x install.sh
 
- #create env
- conda env create -f environment.yml
 
- #activate
- conda activate transforna
+ #run script
+ ./install.sh
  ```
  
- This will create and activate a new conda environment with the name: `transforna`
- ## TransfoRNA API
- In `src/transforna/inference_api.py`, all the functionalities of transforna are offered as APIs. There are two functions of interest:
+## TransfoRNA API
+ In `transforna/src/inference/inference_api.py`, all the functionalities of transforna are offered as APIs. There are two functions of interest:
   - `predict_transforna` : Computes for a set of sequences and for a given model, one of various options; the embeddings, logits, explanatory (similar) sequences, attentions masks or umap coordinates. 
   - `predict_transforna_all_models`: Same as `predict_transforna` but computes the desired option for all the models as well as aggregates the output of the ensemble model.
   Both return a pandas dataframe containing the sequence along with the desired computation. 
 
   Check the script at `src/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
-## Inference
+  
+## Inference from terminal
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
   - `model_path`: The full path of the model. (currently this points to the Seq model)
   
 Also in the `main_config.yaml`, make sure to edit the `model_name` to match the input expected by the loaded model.
-  - `model_name`: add the name of the model. One of `"seq"`,`"seq-seq"`,`"seq-struct"`,`"baseline"` or `"seq-reverse"` (see above)
+  - `model_name`: add the name of the model. One of `"seq"`,`"seq-seq"`,`"seq-struct"`,`"baseline"` or `"seq-rev"` (see above)
 
 
 Then, navigate the repositories' root directory and run the following command:
 
 ```
-python src/main.py inference=True
+python transforna/__main__.py inference=True
 ```
 
-After inference, an `inference_output` in the `src` folder will be created which will then include two files. 
- - The `inference_results_(model_name).csv` that includes the label of each sequence in the inference set and the models' confidence as to whether the sequence is novel (belongs to a class , the model was not trained on) or familiar. 
- - The embedds of each sequence obtained form the model if `log_embedds` in the `main_config` is `True`. 
+After inference, an `inference_output` folder will be created under `outputs/` which will include two files. 
+ - `(model_name)_embedds.csv`: contains vector embedding per sequence in the inference set- (could be used for downstream tasks).
+   *Note: The embedds of each sequence will only be logged if `log_embedds` in the `main_config` is `True`.* 
+ - `(model_name)_inference_results.csv`: Contains columns; Net-Label containing predicted label and Is Familiar? boolean column containing the models' novelty predictor output. (True: familiar/ False: Novel)
+   *Note: The output will also contain the logits of the model is `log_logits` in the `main_config` is `True`.* 
+
 
 ## Train on custom data
-TransfoRNA requires the input data to be in the form of an Anndata, `ad`, where `ad.var` contains all the sequences. Some changes has to be made (follow `configs/train_model_configs/tcga`):
+TransfoRNA can be trained using input data as Anndata, csv or fasta. If the input is anndata, then `anndata.var` should contains all the sequences. Some changes has to be made (follow `configs/train_model_configs/tcga`):
 
 In `configs/train_model_configs/custom`:
-- `dataset_path_train` has to point to the anndata. The anndata has to contain .var dataframe which is sequence indexed. The .var columns should contain `small_RNA_class_annotation`: indicating the major class if available (otherwise should be NaN), `five_prime_adapter_filter`: whether the sequence is considered a real sequence or an artifact (`True `for Real and `False` for artifact), `subclass_name` containing the sub-class name if available (otherwise should be NaN), and a boolean column `hico` indicating whether a sequence is high confidence or non.
-- If sampling from the precursor is required in order to augment the sub-classes, the `precursor_file_path` should include precursors. Follow the scheme of the HBDxBase.csv and have a look at `get_precursor_info` in `src/transforna/utils/utils.py`
+- `dataset_path_train` has to point to the input_data which should contain; a `sequence` column, a `small_RNA_class_annotation` coliumn indicating the major class if available (otherwise should be NaN), `five_prime_adapter_filter` specifies whether the sequence is considered a real sequence or an artifact (`True `for Real and `False` for artifact), a `subclass_name` column containing the sub-class name if available (otherwise should be NaN), and a boolean column `hico` indicating whether a sequence is high confidence or not.
+- If sampling from the precursor is required in order to augment the sub-classes, the `precursor_file_path` should include precursors. Follow the scheme of the HBDxBase.csv and have a look at `PrecursorAugmenter` class in `transforna/src/processing/augmentation.py`
 - `mapping_dict_path` should contain the mapping from sub class to major class. i.e: 'miR-141-5p' to 'miRNA'.
-- `clf_target` sets the classification target of the mopdel and should either `sub_class_hico` for training on targets in `subclass_name` or `major_class_hico` for training on targets in `small_RNA_class_annotation`.
+- `clf_target` sets the classification target of the mopdel and should be either `sub_class_hico` for training on targets in `subclass_name` or `major_class_hico` for training on targets in `small_RNA_class_annotation`. For both, only high confidence sequences are selected for training (based on `hico` column).
 
 In configs/main_config, some changes should be made:
-- change `task` to `custom`.
+- change `task` to `custom` or to whatever name the `custom.py` has been renamed.
 - set the `model_name` as desired.
 
 For training TransfoRNA from the root directory: 
 ```
-python src/main.py
+python transforna/__main__.py
 ```
 Using [Hydra](https://hydra.cc/), any option in the main config can be changed. For instance, to train a `Seq-Struct` TransfoRNA model without using a validation split:
 ```
-python src/main.py train_split=False model_name='seq-struct'
+python transforna/__main__.py train_split=False model_name='seq-struct'
 ```
 After training, an output folder is automatically created in the root directory where training is logged. 
 The structure of the output folder is chosen by hydra to be `/day/time/results folders`. Results folders are a set of folders created during training:
@@ -132,7 +134,9 @@ The structure of the output folder is chosen by hydra to be `/day/time/results f
 - `embedds`:
   - Contains a file per each split (train/valid/test/ood/na).
   - Each file is a `csv` containing the sequences plus their embeddings (obtained by the model and represent numeric representation of a given RNA sequence) as well as the logits. The logits are values the models produce for each sequence, reflecting its confidence of a sequence belonging to a certain class.
-- `meta`: A folder containing a `yaml` file with all the hyperparameters used for the current run. 
+- `meta`: A folder containing a `yaml` file with all the hyperparameters used for the current run.
+- `analysis`: contains the learned novelty threshold seperating the in-distribution set(Familiar) from the out of distribution set (Novel).
+- `figures`: some figures are saved containing the Normalized Levenstein Distance NLD, distribution per split.
 
 
 ## Additional Datasets (Objective):
