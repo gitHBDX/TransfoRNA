@@ -1,14 +1,22 @@
-This is the transforna package which contains the skorch model, data preprocessing and sub/major class classification results logging.
+This is the transforna package which contains the following modules:
 
 - `train` is the entry point where data preparation, training and results logging is executed.
 
-- `utils` contains all functions used for data preprocessing, including preparing the data according to each models input, data splitting and filtering.
+- `processing` contains all classes used for data augmentation, tokenization and splitting.
 
-- `model` contains the skorch model which wraps the actual model described in model components
-
-- `dataset` is where the sequences/secondary structures are tokenized. if the task is premirna or sncrna then dataset_benchmark.py is called, otherwise dataset_tcga.py.
+- `model` contains the skorch model `skorchWrapper` that wraps the torch model described in model components
 
 - `callbacks` contains the learning rate scheduler, loss function and the metrics used to evaluate the model.
-- `score` compute the balanced accuracy of the classification task -major or sub-class- for each of the splits with known labels(train/valid/test). 
 
-![Screenshot 2022-12-14 at 18 30 43](https://user-images.githubusercontent.com/82571392/207665995-cae86d2d-78a0-498a-9504-2397aa2da344.png)
+- `score` compute the balanced accuracy of the classification task -major or sub-class- for each of the splits with known labels(train/valid/test).
+
+- `novelty_prediction` contains two novelty metrics; entropy based(obsolete) and Normalized Levenstein Distance, NLD based (current).
+
+- `inference` contains all inference functionalities. check `transforna/scripts/test_inference_api.py` for how-to-use.
+
+A schematic of the TransfoRNA Architecture:
+
+
+![TransfoRNA Architecture](https://github.com/gitHBDX/TransfoRNA/assets/82571392/a1bfbb1e-32c9-4faf-96ae-46727c27e321)
+
+Model evauation image [source](https://medium.com/@sachinsoni600517/model-evaluation-techniques-in-machine-learning-47ae9fb0ad33)
