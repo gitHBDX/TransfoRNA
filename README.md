@@ -61,7 +61,7 @@ This will download three subfolders that should be kept on the same folder level
   <img width="835" alt="Screenshot 2024-05-22 at 10 19 15" src="https://github.com/gitHBDX/TransfoRNA/assets/82571392/225d2c98-ed45-4ca7-9e86-557a73af702d">
 
 - transforna contains two folders:
-    - `src` folder which contains transforna package. View transforna's architecture (here)[https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/src/readme.md].
+    - `src` folder which contains transforna package. View transforna's architecture [here](https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/src/readme.md).
     - `bin` folder contains all scripts necessary for reproducing manuscript figures.
 
 ## Installation
