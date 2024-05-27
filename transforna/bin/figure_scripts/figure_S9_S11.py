@@ -22,7 +22,7 @@ if dataset == 'TCGA':
 else:    
     dataset_path_train: str = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/TransfoRNA/compare_binning_strategies/v05/2024-04-19__230126_LC_DI_HB_GEL_v23.01.00/sRNA_anno_aggregated_on_seq.csv'
 
-prediction_single_pd = predict_transforna(['AAAAAAACCCCCTTTTTTT'],model='Seq',logits_flag = True,trained_on='id',path_to_id_models=models_path)
+prediction_single_pd = predict_transforna(['AAAAAAACCCCCTTTTTTT'],model='Seq',logits_flag = True,trained_on='id',path_to_models=models_path)
 sub_classes_used_for_training = prediction_single_pd.columns.tolist()
 
 var = load(dataset_path_train).set_index('sequence')
@@ -46,7 +46,7 @@ elif hico_loco_na_flag == 'hico':
     curr_seqs = hico_seqs_id
     curr_labels = hico_labels_id
 
-full_df = predict_transforna_all_models(sequences=curr_seqs,path_to_id_models=models_path)
+full_df = predict_transforna_all_models(sequences=curr_seqs,path_to_models=models_path)
 
 
 #%%

@@ -20,7 +20,7 @@ from ..utils.utils import (revert_seq_tokenization,
 from anndata import AnnData
 
 logger = logging.getLogger(__name__)
-class PrepareGeneData:
+class DataSplitter:
     def __init__(self,tokenizer,configs):
         self.tokenizer = tokenizer
         self.configs = configs

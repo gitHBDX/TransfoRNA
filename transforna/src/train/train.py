@@ -10,7 +10,7 @@ from ..novelty_prediction.id_vs_ood_nld_clf import compute_nlds
 from ..processing.augmentation import DataAugmenter
 from ..processing.seq_tokenizer import SeqTokenizer
 from ..processing.splitter import *
-from ..processing.splitter import PrepareGeneData
+from ..processing.splitter import DataSplitter
 from ..score.score import (compute_score_benchmark, compute_score_tcga,
                            infere_additional_test_data)
 from ..utils.file import load, save
@@ -57,7 +57,7 @@ def train(cfg:Dict= None,path:str = None,output_dir:str = None):
     else: 
         df = DataAugmenter(dataset,cfg).get_augmented_df()
         tokenizer = SeqTokenizer(df,cfg)
-        all_data = PrepareGeneData(tokenizer,cfg).prepare_data_tcga()
+        all_data = DataSplitter(tokenizer,cfg).prepare_data_tcga()
 
     #sync skorch config with params in train and model config
     sync_skorch_with_config(cfg["model"]["skorch_model"],cfg)

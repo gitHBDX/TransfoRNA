@@ -149,7 +149,7 @@ hicos_mc_before_id_stats = tcga_df.loc[hico_seqs].subclass_name.map(mapping_dict
 #remove mcs with ; in them
 #hicos_mc_before_id_stats = hicos_mc_before_id_stats[~hicos_mc_before_id_stats.index.str.contains(';')]
 seqs_non_hico_id = tcga_df['subclass_name'][tcga_df['hico'] == False].index.values
-id_df = predict_transforna(sequences=seqs_non_hico_id,model='Seq-Rev',trained_on='id',path_to_id_models=models_path)
+id_df = predict_transforna(sequences=seqs_non_hico_id,model='Seq-Rev',trained_on='id',path_to_models=models_path)
 id_df = id_df[id_df['Is Familiar?']].set_index('Sequence')
 #print the percentage of sequences with no_annotation and with
 print('Percentage of sequences with no annotation: %s'%(id_df[id_df['Net-Label'] == 'no_annotation'].shape[0]/id_df.shape[0]))
@@ -167,7 +167,7 @@ hicos_mc_after_id_stats = hicos_mc_after_id_stats+hicos_mc_before_id_stats
 
 #%%
 seqs_non_hico_full = list(set(seqs_non_hico_id).difference(set(id_df.index.values)))
-full_df = predict_transforna_all_models(sequences=seqs_non_hico_full,trained_on='full',path_to_id_models=models_path)
+full_df = predict_transforna_all_models(sequences=seqs_non_hico_full,trained_on='full',path_to_models=models_path)
 #UNCOMMENT TO COMPUTE BEFORE AND AFTER PER MC: table_4
 #ensemble_df = full_df[full_df['Model']=='Ensemble']
 #ensemble_df['Major Class'] = ensemble_df['Net-Label'].map(mapping_dict)

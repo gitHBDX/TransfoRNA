@@ -56,19 +56,19 @@ def aggregate_ensemble_model(lev_dist_df:pd.DataFrame):
     return lev_dist_df.reset_index(drop=True)
 
 
-def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_id_models:str):
+def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_models:str):
     transforna_folder = "TransfoRNA_ID"
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
 
-    model_path = f"{path_to_id_models}/{transforna_folder}/{mc_or_sc}/{model}/meta/hp_settings.yaml"
+    model_path = f"{path_to_models}/{transforna_folder}/{mc_or_sc}/{model}/meta/hp_settings.yaml"
     cfg = OmegaConf.load(model_path)
     return cfg
 
 def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sub_class',\
                     logits_flag:bool = False,attention_flag:bool = False,\
                         similarity_flag:bool=False,n_sim:int=3,embedds_flag:bool = False, \
-                            umap_flag:bool = False,trained_on:str='full',path_to_id_models:str='') -> pd.DataFrame:
+                            umap_flag:bool = False,trained_on:str='full',path_to_models:str='') -> pd.DataFrame:
     '''
     This function predicts the major class or sub class of a list of sequences using the TransfoRNA model.
     Additionaly, it can return logits, attention scores, similarity scores, gene embeddings or umap embeddings.
@@ -91,8 +91,8 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     assert sum([logits_flag,attention_flag,similarity_flag,embedds_flag,umap_flag]) <= 1, 'One option at most can be True'
     # capitalize the first letter of the model and the first letter after the -
     model = "-".join([word.capitalize() for word in model.split("-")])
-    cfg = read_inference_model_config(model,mc_or_sc,trained_on,path_to_id_models)
-    cfg = update_config_with_inference_params(cfg,mc_or_sc,trained_on,path_to_id_models)
+    cfg = read_inference_model_config(model,mc_or_sc,trained_on,path_to_models)
+    cfg = update_config_with_inference_params(cfg,mc_or_sc,trained_on,path_to_models)
     root_dir = Path(__file__).parents[1].absolute()
 
     with redirect_stdout(None):
@@ -182,7 +182,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
 
 def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_class',logits_flag: bool = False, attention_flag: bool = False,\
         similarity_flag: bool = False, n_sim:int = 3,
-        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full",path_to_id_models:str='') -> pd.DataFrame:
+        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full",path_to_models:str='') -> pd.DataFrame:
     """
     Predicts the labels of the sequences using all the models available in the transforna package.
     If non of the flags are true, it constructs and aggrgates the output of the ensemble model.
@@ -210,7 +210,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_clas
     df = None
     for model in models:
         logger.info(model)
-        df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_id_models = path_to_id_models)
+        df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_models = path_to_models)
         df_["Model"] = model
         df = pd.concat([df, df_], axis=0)
     #aggregate ensemble model if not of the flags are true

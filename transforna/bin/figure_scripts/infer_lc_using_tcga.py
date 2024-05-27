@@ -377,7 +377,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
     #run prediction
-    prediction_pd = predict_transforna_all_models(hico_seqs,trained_on=trained_on,path_to_id_models=path_to_models)
+    prediction_pd = predict_transforna_all_models(hico_seqs,trained_on=trained_on,path_to_models=path_to_models)
     prediction_pd['split'] = fig_prefix
     #the if condition here is to make sure to filter seqs with sub classes not used in training
     if not infer_ood and not infer_relaxed_mirna and not infer_hico:
@@ -398,7 +398,7 @@ if __name__ == '__main__':
                 print('\n')
         else:  
             #only to get classes used for training
-            prediction_single_pd = predict_transforna(hico_seqs[0],model='Seq',logits_flag = True,trained_on=trained_on,path_to_id_models=path_to_models)
+            prediction_single_pd = predict_transforna(hico_seqs[0],model='Seq',logits_flag = True,trained_on=trained_on,path_to_models=path_to_models)
             sub_classes_used_for_training = prediction_single_pd.columns.tolist()
         
 

@@ -26,7 +26,7 @@ from .file import load
 
 logger = logging.getLogger(__name__)
 
-def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sub_class',trained_on:str = 'id',path_to_id_models:str = 'models/tcga/') -> DictConfig:
+def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sub_class',trained_on:str = 'id',path_to_models:str = 'models/tcga/') -> DictConfig:
     inference_config = config.copy()
     model = config['model_name']
     model = "-".join([word.capitalize() for word in model.split("-")])
@@ -34,7 +34,7 @@ def update_config_with_inference_params(config:DictConfig,mc_or_sc:str='sub_clas
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
 
-    inference_config['inference_settings']["model_path"] = f'{path_to_id_models}{transforna_folder}/{mc_or_sc}/{model}/ckpt/model_params_tcga.pt'
+    inference_config['inference_settings']["model_path"] = f'{path_to_models}{transforna_folder}/{mc_or_sc}/{model}/ckpt/model_params_tcga.pt'
     inference_config["inference"] = True
     inference_config["log_logits"] = False
 

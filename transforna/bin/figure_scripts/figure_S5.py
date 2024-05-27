@@ -70,7 +70,7 @@ predicted_fam_but_ann_novel_df['predicted_label_mc'] = predicted_fam_but_ann_nov
 #for the each of the sequence in predicted_fam_but_ann_novel_df, compute the sim seq along with the lv distance
 from transforna import predict_transforna
 
-sim_df = predict_transforna(model=model_name,sequences=predicted_fam_but_ann_novel_df.index.tolist(),similarity_flag=True,n_sim=1,trained_on='id',path_to_id_models='/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/')
+sim_df = predict_transforna(model=model_name,sequences=predicted_fam_but_ann_novel_df.index.tolist(),similarity_flag=True,n_sim=1,trained_on='id',path_to_models='/nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/')
 sim_df = sim_df.set_index('Sequence')
 
 #append the sim_df to predicted_fam_but_ann_novel_df except for the Labels column

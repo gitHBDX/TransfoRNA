@@ -36,7 +36,7 @@ class IDModelAugmenter:
         infer_pd = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
 
         mc_or_sc = 'major_class' if 'major_class' in self.config['model_config']['clf_target'] else 'sub_class'
-        inference_config = update_config_with_inference_params(self.config,mc_or_sc=mc_or_sc,path_to_id_models=self.config['path_to_id_models'])
+        inference_config = update_config_with_inference_params(self.config,mc_or_sc=mc_or_sc,path_to_models=self.config['path_to_models'])
         model_path = inference_config['inference_settings']["model_path"]
         logger.info(f"Augmenting hico sequences based on predictions from model at: {model_path}")
 
