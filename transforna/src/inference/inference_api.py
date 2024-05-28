@@ -150,7 +150,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             #assign top_5_seqs list to df column
             sim_df[f'Explanatory Sequence'] = top_n_seqs
             sim_df['NLD'] = lev_dist
-            sim_df['Labels'] = top_n_labels
+            sim_df['Explanatory Label'] = top_n_labels
             sim_df['Novelty Threshold'] = lv_threshold
             #for every query sequence, order the NLD in a increasing order
             sim_df = sim_df.sort_values(by=['Sequence','NLD'],ascending=[False,True])
