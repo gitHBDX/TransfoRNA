@@ -159,6 +159,8 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         logger.info(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
         #for every n_sim elements in the list, get the smallest levenstein distance 
         lv_dist_closest = [min(lev_dist[i:i+n_sim]) for i in range(0,len(lev_dist),n_sim)]
+        top_n_labels_closest = [top_n_labels[i:i+n_sim][np.argmin(lev_dist[i:i+n_sim])] for i in range(0,len(lev_dist),n_sim)]
+        top_n_seqs_closest = [top_n_seqs[i:i+n_sim][np.argmin(lev_dist[i:i+n_sim])] for i in range(0,len(lev_dist),n_sim)]
         infer_pd['Is Familiar?'] = [True if lv<lv_threshold else False for lv in lv_dist_closest]
 
         if umap_flag:
@@ -170,12 +172,16 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             gene_embedds_df = pd.DataFrame(umap.fit_transform(scaled_embedds),columns=['UMAP1','UMAP2'])
             gene_embedds_df['Net-Label'] = infer_pd['Net-Label'].values
             gene_embedds_df['Is Familiar?'] = infer_pd['Is Familiar?'].values
+            gene_embedds_df['Explanatory Label'] = top_n_labels_closest
+            gene_embedds_df['Explanatory Sequence'] = top_n_seqs_closest
             gene_embedds_df['Sequence'] = infer_pd.index
             return gene_embedds_df
 
         #override threshold
         infer_pd['Novelty Threshold'] = lv_threshold
         infer_pd['NLD'] = lv_dist_closest
+        infer_pd['Explanatory Label'] = top_n_labels_closest
+        infer_pd['Explanatory Sequence'] = top_n_seqs_closest
         infer_pd = infer_pd.round({"NLD": 2, "Novelty Threshold": 2})
         logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
