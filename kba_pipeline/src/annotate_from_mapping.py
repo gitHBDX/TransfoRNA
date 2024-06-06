@@ -8,6 +8,7 @@ import logging
 import numpy as np
 import pandas as pd
 from difflib import get_close_matches
+from Levenshtein import distance
 import json
 
 from joblib import Parallel, delayed
@@ -76,23 +77,6 @@ def extract_general_info(mapping_file):
     mapping_df.loc[:,'seq_length'] = mapping_df.sequence.apply(lambda x: len(x))
     mapping_df.loc[:,'ref_end'] = mapping_df.ref_start +  mapping_df.seq_length - 1
     mapping_df.loc[:,'mitochondrial'] = np.where(mapping_df.reference.str.contains(r'(\|MT-)|(12S)|(16S)'), 'mito', 'nuclear')
-
-    # get non-templated 3' polyA and polyT tails
-    ref_end_df = mapping_df.mm_descriptors.str.split(';', expand=True)
-    if ref_end_df.shape[1] == 1:
-        tail_df = pd.concat([(mapping_df.seq_length - 1)],axis=1)
-        tail_df.columns = [0]
-    elif ref_end_df.shape[1] == 2:
-        tail_df = pd.concat([(mapping_df.seq_length - 2),(mapping_df.seq_length - 1)],axis=1)
-        tail_df.columns = [0,1]
-    elif ref_end_df.shape[1] == 3:
-        tail_df = pd.concat([(mapping_df.seq_length - 3),(mapping_df.seq_length - 2),(mapping_df.seq_length - 1)],axis=1)
-        tail_df.columns = [0,1,2]
-    ref_end_mask = ref_end_df.apply(lambda x: x.str.split(':').str[0]).fillna(0).astype(int) == tail_df
-    ref_end_df = ref_end_df.apply(lambda x: x.str.split('>').str[1])[ref_end_mask]
-    ref_end = ref_end_df.fillna('').apply(lambda x: ''.join(x),axis=1)
-    ref_end[~ref_end.str.match(r'(^A$)|(^AA$)|(^AAA$)|(^T)$|(^TT$)|(^TTT$)')] = ''
-    mapping_df.loc[:,'polyAT'] = ref_end
     
     return mapping_df
 
@@ -139,39 +123,60 @@ def tRNA_annotation(mapping_df):
     return tRNAs_df
 
 #%%
+def faustrules_check(row):
+    """Check if isomiRs follow Faustrules (based on Tomasello et al. 2021).
+    """
+    
+    # mark seqs that are not in range +/- 2nt of mature start
+    # check if ref_start.between(miRNAs_df.mature_start-2, miRNAs_df.mature_start+2, inclusive='both')]
+    ref_start = row['ref_start']
+    mature_start = row['mature_start']
+
+    if ref_start < mature_start - 2 or ref_start > mature_start + 2:
+        return False
+    
+    # mark seqs with mismatch unless A>G or C>T in seed region (= position 0-8) or 3' polyA/polyT (max 3nt)
+    if pd.isna(row['mm_descriptors']):
+        return True
+    
+    seed_region_positions = set(range(9))
+    non_templated_ends = {'A', 'AA', 'AAA', 'T', 'TT', 'TTT'}
+    
+    sequence = row['sequence']
+    mm_descriptors = row['mm_descriptors'].split(';')
+    
+    seed_region_mismatches = 0
+    three_prime_end_mismatches = 0
+    
+    for descriptor in mm_descriptors:
+        pos, change = descriptor.split(':')
+        pos = int(pos)
+        original, new = change.split('>')
+        
+        if pos in seed_region_positions and (original == 'A' and new == 'G' or original == 'C' and new == 'T'):
+            seed_region_mismatches += 1
+        
+        if pos >= len(sequence) - 3 and sequence[pos:] in non_templated_ends:
+            three_prime_end_mismatches += 1
+    
+    total_mismatches = seed_region_mismatches + three_prime_end_mismatches
+
+    return total_mismatches == len(mm_descriptors)
+
 @log_time(log)
 def miRNA_annotation(mapping_df):
-    """Extract miRNA specific annotation from mapping. IsomiR rules based on Tomasello et al. 2021 are applied.
+    """Extract miRNA specific annotation from mapping. RaH Faustrules are applied.
     """
+    
+    miRNAs_df = mapping_df[mapping_df.small_RNA_class_annotation == 'miRNA']
+    
+    nr_missing_alignments_expected = len(miRNAs_df.loc[miRNAs_df.duplicated(['tmp_seq_id','reference'], keep='first'),:])
+    
     # load positions of mature miRNAs within precursor
     miRNA_pos_df = pd.read_csv(mat_miRNA_pos_path, sep='\t')
     miRNA_pos_df.drop(columns=['precursor_length'], inplace=True)
-
-    miRNAs_df = mapping_df[mapping_df.small_RNA_class_annotation == 'miRNA']
     miRNAs_df = miRNAs_df.merge(miRNA_pos_df, left_on='precursor_name_full', right_on='name_precursor', how='left')
-    # drop seqs that are not in range +/- 2nt of mature start
-    miRNAs_df = miRNAs_df[miRNAs_df.ref_start.between(miRNAs_df.mature_start-2, miRNAs_df.mature_start+2, inclusive='both')]
-    # drop seqs with mismatch unless A>G or C>T in seed region (= position 0-8) or 3' polyA/polyT
-    miRNAs_df = miRNAs_df[
-        (
-            ((miRNAs_df.mms == miRNAs_df.polyAT.apply(lambda x: len(x))) & ~miRNAs_df.polyAT.isna()) 
-            | (miRNAs_df.mm_descriptors.str.split(';',expand=True).apply(lambda x: x.str.contains(r'(^[0-8]:A>G)|(^[0-8]:C>T)',na=True)).all(axis=1)) 
-        )]
-    # add difference to mature position (5' end, 3' end)
-    miRNAs_df['miRNA_mature_diff'] = '5p:' + (miRNAs_df.ref_start - miRNAs_df.mature_start).astype(int).astype(str) + ',3p:' + (miRNAs_df.ref_end - miRNAs_df.mature_end).astype(int).astype(str) + ',nt3p:' + miRNAs_df.polyAT
-    # add ref_iso flag
-    miRNAs_df['miRNA_ref_iso'] = np.where(
-        (
-            (miRNAs_df.ref_start == miRNAs_df.mature_start) 
-            & (miRNAs_df.ref_end == miRNAs_df.mature_end) 
-            & (miRNAs_df.mms == 0)
-        ), 'refmiR', 'isomiR'
-    )
-    # add subclass (NOTE: in cases where subclass is not part of mature name, use position relative to precursor half to define group )
-    miRNAs_df['miRNA__subclass'] = np.where(miRNAs_df.name_mature.str.endswith('5p'), '5p', np.where(miRNAs_df.name_mature.str.endswith('3p'), '3p', 'tbd'))
-    miRNAs_df.loc[((miRNAs_df.miRNA__subclass == 'tbd') & (miRNAs_df.mature_start < miRNAs_df.precursor_length/2)), 'miRNA__subclass'] = '5p'
-    miRNAs_df.loc[((miRNAs_df.miRNA__subclass == 'tbd') & (miRNAs_df.mature_start >= miRNAs_df.precursor_length/2)), 'miRNA__subclass'] = '3p'
-    
+
     # load mature miRNA sequences from miRBase
     miRBase_mature_df = fasta2df_subheader(miRBase_mature_path,0)
     # subset to human miRNAs
@@ -181,18 +186,41 @@ def miRNA_annotation(mapping_df):
     miRBase_mature_df.columns = ['name_mature','ref_miR_seq']
     # add 'ref_miR_seq' 
     miRNAs_df = miRNAs_df.merge(miRBase_mature_df, left_on='name_mature', right_on='name_mature', how='left')
+
+    # for each duplicated tmp_seq_id/reference combi, keep the one lowest lev dist of sequence to ref_miR_seq
+    miRNAs_df['lev_dist'] = miRNAs_df.apply(lambda x: distance(x['sequence'], x['ref_miR_seq']), axis=1)
+    miRNAs_df = miRNAs_df.sort_values(by=['tmp_seq_id','lev_dist'], ascending=[True, True]).drop_duplicates(['tmp_seq_id','reference'], keep='first')
+
+    # add ref_iso flag
+    miRNAs_df['miRNA_ref_iso'] = np.where(
+        (
+            (miRNAs_df.ref_start == miRNAs_df.mature_start) 
+            & (miRNAs_df.ref_end == miRNAs_df.mature_end) 
+            & (miRNAs_df.mms == 0)
+        ), 'refmiR', 'isomiR'
+    )
+
+    # apply RaH Faustrules
+    miRNAs_df['faustrules_check'] =  miRNAs_df.apply(faustrules_check, axis=1)
+
+    # set miRNA_ref_iso to 'misc-miR' if faustrules_check is False
+    miRNAs_df.loc[~miRNAs_df.faustrules_check,'miRNA_ref_iso'] = 'misc-miR'
+
+    # set subclass_name to name_mature if faustrules_check is True, else use precursor_name
+    miRNAs_df['subclass_name'] = np.where(miRNAs_df.faustrules_check, miRNAs_df.name_mature, miRNAs_df.precursor_name)
+
+    # store name_mature for functional analysis as miRNA_names, set miR- to mir- if faustrules_check is False
+    miRNAs_df['miRNA_names'] = np.where(miRNAs_df.faustrules_check, miRNAs_df.name_mature, miRNAs_df.name_mature.str.replace('miR-', 'mir-'))
+
+    # add subclass (NOTE: in cases where subclass is not part of mature name, use position relative to precursor half to define group )
+    miRNAs_df['subclass_type'] = np.where(miRNAs_df.name_mature.str.endswith('5p'), '5p', np.where(miRNAs_df.name_mature.str.endswith('3p'), '3p', 'tbd'))
+    miRNAs_df.loc[((miRNAs_df.subclass_type == 'tbd') & (miRNAs_df.mature_start < miRNAs_df.precursor_length/2)), 'subclass_type'] = '5p'
+    miRNAs_df.loc[((miRNAs_df.subclass_type == 'tbd') & (miRNAs_df.mature_start >= miRNAs_df.precursor_length/2)), 'subclass_type'] = '3p'
     
-    miRNAs_df['subclass_name'] = miRNAs_df.name_mature
-    miRNAs_df = miRNAs_df[list(mapping_df.columns) + ['miRNA__subclass','subclass_name','miRNA_ref_iso','miRNA_mature_diff','ref_miR_seq']]
+    # subset to relevant columns
+    miRNAs_df = miRNAs_df[list(mapping_df.columns) + ['subclass_name','miRNA_ref_iso','miRNA_names','ref_miR_seq']]
 
-    # set all other miRNA hairpin maps as misc-miRNA
-    miRNAs_df = mapping_df[mapping_df.small_RNA_class_annotation == 'miRNA'].merge(miRNAs_df, left_on=list(mapping_df.columns), right_on=list(mapping_df.columns), how='left')
-    miRNAs_df['miRNA__subclass'] = miRNAs_df.miRNA__subclass.fillna('misc')
-    miRNAs_df.loc[miRNAs_df.subclass_name.isna(),'subclass_name'] = miRNAs_df.precursor_name_full
-    miRNAs_df['subclass_type'] = miRNAs_df.miRNA__subclass
-    miRNAs_df = miRNAs_df.drop(columns=['miRNA__subclass'])
-
-    return miRNAs_df
+    return miRNAs_df, nr_missing_alignments_expected
 
 
 #%%
@@ -228,18 +256,18 @@ def other_sRNA_annotation_new_binning(mapping_df):
 @log_time(log)
 def extract_sRNA_class_specific_info(mapping_df):
     tRNAs_df = tRNA_annotation(mapping_df)
-    miRNAs_df = miRNA_annotation(mapping_df)
+    miRNAs_df, nr_missing_alignments_expected = miRNA_annotation(mapping_df)
     other_sRNAs_df = other_sRNA_annotation_new_binning(mapping_df)
     
     # add miRNA columns
-    tRNAs_df[['miRNA_ref_iso', 'miRNA_mature_diff', 'ref_miR_seq']] = pd.DataFrame(columns=['miRNA_ref_iso', 'miRNA_mature_diff', 'ref_miR_seq'])
-    other_sRNAs_df[['miRNA_ref_iso', 'miRNA_mature_diff', 'ref_miR_seq']] = pd.DataFrame(columns=['miRNA_ref_iso', 'miRNA_mature_diff', 'ref_miR_seq'])
+    tRNAs_df[['miRNA_ref_iso', 'miRNA_names', 'ref_miR_seq']] = pd.DataFrame(columns=['miRNA_ref_iso', 'miRNA_names', 'ref_miR_seq'])
+    other_sRNAs_df[['miRNA_ref_iso', 'miRNA_names', 'ref_miR_seq']] = pd.DataFrame(columns=['miRNA_ref_iso', 'miRNA_names', 'ref_miR_seq'])
     
     # re-concat sRNA class dfs
     sRNA_anno_df = pd.concat([miRNAs_df, tRNAs_df, other_sRNAs_df],axis=0)
 
     # TEST if alignments were lost or duplicated
-    assert (len(mapping_df) == len(sRNA_anno_df)), "alignments were lost or duplicated" 
+    assert ((len(mapping_df) - nr_missing_alignments_expected) == len(sRNA_anno_df)), "alignments were lost or duplicated" 
     
     return sRNA_anno_df
 
@@ -255,11 +283,12 @@ def aggregate_info_per_seq(sRNA_anno_df):
     # fillna of 'subclass_name_bin_pos' with 'subclass_name'
     sRNA_anno_df['subclass_name_bin_pos'] = sRNA_anno_df['subclass_name_bin_pos'].fillna(sRNA_anno_df['subclass_name'])
     # get aggregated info per seq 
-    aggreg_per_seq_df = sRNA_anno_df.groupby(['sequence']).agg({'small_RNA_class_annotation': lambda x: ';'.join(sorted(x.unique())), 'pseudo_class': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'subclass_type': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'subclass_name': lambda x: ';'.join(sorted(x.unique())), 'subclass_name_bin_pos': lambda x: ';'.join(sorted(x.unique())), 'precursor_name_full': lambda x: ';'.join(sorted(x.unique())), 'mms': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'reference': lambda x: len(x), 'mitochondrial': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'ref_miR_seq': lambda x: ';'.join(x.fillna('').unique())})
-    aggreg_per_seq_df.ref_miR_seq = aggreg_per_seq_df.ref_miR_seq.str.replace(r';$','')
+    aggreg_per_seq_df = sRNA_anno_df.groupby(['sequence']).agg({'small_RNA_class_annotation': lambda x: ';'.join(sorted(x.unique())), 'pseudo_class': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'subclass_type': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'subclass_name': lambda x: ';'.join(sorted(x.unique())), 'subclass_name_bin_pos': lambda x: ';'.join(sorted(x.unique())), 'miRNA_names': lambda x: ';'.join(x.fillna('').unique()), 'precursor_name_full': lambda x: ';'.join(sorted(x.unique())), 'mms': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'reference': lambda x: len(x), 'mitochondrial': lambda x: ';'.join(x.astype(str).sort_values(ascending=True).unique()), 'ref_miR_seq': lambda x: ';'.join(x.fillna('').unique())})
+    aggreg_per_seq_df['miRNA_names'] = aggreg_per_seq_df.miRNA_names.str.replace(r';$','', regex=True)
+    aggreg_per_seq_df['ref_miR_seq'] = aggreg_per_seq_df.ref_miR_seq.str.replace(r';$','', regex=True)
     aggreg_per_seq_df['mms'] = aggreg_per_seq_df['mms'].astype(int)
 
-    # re-add 'miRNA_ref_iso'
+    # re-add 'miRNA_ref_iso','tRNA_ref_iso'
     refmir_df = sRNA_anno_df[['sequence','miRNA_ref_iso','tRNA_ref_iso']]
     refmir_df.drop_duplicates('sequence', inplace=True)
     refmir_df.set_index('sequence', inplace=True)
