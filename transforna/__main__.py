@@ -1,4 +1,3 @@
-import argparse
 import logging
 import os
 import sys
@@ -15,7 +14,6 @@ warnings.filterwarnings("ignore")
 
 
 logger = logging.getLogger(__name__)
-
 
 def add_config_to_sys_path():
     cfg = HydraConfig.get()

@@ -17,9 +17,10 @@ from ..utils.file import load, save
 from ..utils.utils import (revert_seq_tokenization,
                            update_config_with_dataset_params_benchmark,
                            update_config_with_dataset_params_tcga)
+from anndata import AnnData
 
 logger = logging.getLogger(__name__)
-class PrepareGeneData:
+class DataSplitter:
     def __init__(self,tokenizer,configs):
         self.tokenizer = tokenizer
         self.configs = configs
@@ -113,9 +114,30 @@ class PrepareGeneData:
         return df
 
     def remove_fewer_samples(self,data_df):
-        counts = data_df['Labels'].value_counts()
-        fewer_class_ids = counts[counts < self.min_num_samples_per_class].index
-        fewer_class_labels = [i[0]  for i in fewer_class_ids]
+        if 'sub_class' in self.configs['model_config']['clf_target']:
+            counts = data_df['Labels'].value_counts()
+            fewer_class_ids = counts[counts < self.min_num_samples_per_class].index
+            fewer_class_labels = [i[0]  for i in fewer_class_ids]
+        elif 'major_class' in self.configs['model_config']['clf_target']:
+            #insure that major classes are the same as the one used when training for sub_class
+            #this is done for performance comparisons to be valid
+            #otherwise major class models would be trained on more major classes than sub_class models
+            tcga_df = load(self.configs['train_config'].dataset_path_train)
+            #only keep hico
+            tcga_df = tcga_df[tcga_df['hico'] == True]
+            if isinstance(tcga_df,AnnData):
+                tcga_df = tcga_df.var
+            #get subclass_name with samples higher than self.min_num_samples_per_class
+            counts = tcga_df['subclass_name'].value_counts()
+            all_subclasses = tcga_df['subclass_name'].unique()
+            selected_subclasses = counts[counts >= self.min_num_samples_per_class].index
+            #convert subclass_name to major_class
+            subclass_to_major_class_dict = load(self.configs['train_config'].mapping_dict_path)
+            all_major_classes = list(set([subclass_to_major_class_dict[sub_class]  for sub_class in all_subclasses]))
+            selected_major_classes = list(set([subclass_to_major_class_dict[sub_class] for sub_class in selected_subclasses]))
+            fewer_class_labels = list(set(all_major_classes) - set(selected_major_classes))
+
+        #remove samples with major_class not in major_classes
         fewer_samples_per_class_df = data_df.loc[data_df['Labels'].isin(fewer_class_labels).values, :]
         fewer_ids = data_df.index.isin(fewer_samples_per_class_df.index)
         data_df = data_df[~fewer_ids]
@@ -135,6 +157,7 @@ class PrepareGeneData:
         no_annotaton_df = no_annotaton_df.reset_index(drop=True)
 
         if self.trained_on == 'full':
+            #duplication is done to ensure as other wise train_test_split will fail
             data_df = self.duplicate_fewer_classes(data_df)
             ood_dict = {}
         else:
@@ -142,11 +165,16 @@ class PrepareGeneData:
             ood_dict = {"ood_df":ood_df}
         #split data
         train_df,valid_test_df = train_test_split(data_df,stratify=data_df["Labels"],train_size=0.8,random_state=self.seed)
-        valid_df,test_df = train_test_split(valid_test_df,stratify=valid_test_df["Labels"],train_size=0.5,random_state=self.seed)
-
-        #if trained_on == full, add valid and test to train to train on all data
-        if self.trained_on == 'full':
-            train_df = train_df.append(valid_df).append(test_df).reset_index(drop=True)
+        if self.trained_on == 'id':
+            valid_df,test_df = train_test_split(valid_test_df,stratify=valid_test_df["Labels"],train_size=0.5,random_state=self.seed)
+        else:
+            #we need to use all n sequences in the training set, however, unseen samples should be gathered for training novelty prediction,
+            #otherwise NLD for test would be zero
+            #remove one sample from each class to test_df
+            test_df = valid_test_df.drop_duplicates(subset=[('Labels',0)], keep="last")
+            test_ids = valid_test_df.index.isin(test_df.index)
+            valid_df = valid_test_df[~test_ids].reset_index(drop=True)
+            train_df = train_df.append(valid_df).reset_index(drop=True)
 
         self.splits_df_dict =  {"train_df":train_df,"valid_df":valid_df,"test_df":test_df,"artificial_df":artificial_df,"no_annotation_df":no_annotaton_df} | ood_dict
 

@@ -5,16 +5,14 @@ from argparse import ArgumentParser
 from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import pandas as pd
-import yaml
 from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from sklearn.preprocessing import StandardScaler
 from umap import UMAP
-from yaml.loader import SafeLoader
 
 from ..novelty_prediction.id_vs_ood_nld_clf import get_closest_ngbr_per_split
 from ..processing.seq_tokenizer import SeqTokenizer
@@ -58,19 +56,19 @@ def aggregate_ensemble_model(lev_dist_df:pd.DataFrame):
     return lev_dist_df.reset_index(drop=True)
 
 
-def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_id_models:str):
+def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_models:str):
     transforna_folder = "TransfoRNA_ID"
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
 
-    model_path = f"{path_to_id_models}/{transforna_folder}/{mc_or_sc}/{model}/meta/hp_settings.yaml"
+    model_path = f"{path_to_models}/{transforna_folder}/{mc_or_sc}/{model}/meta/hp_settings.yaml"
     cfg = OmegaConf.load(model_path)
     return cfg
 
 def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sub_class',\
                     logits_flag:bool = False,attention_flag:bool = False,\
                         similarity_flag:bool=False,n_sim:int=3,embedds_flag:bool = False, \
-                            umap_flag:bool = False,trained_on:str='full',path_to_id_models:str='') -> pd.DataFrame:
+                            umap_flag:bool = False,trained_on:str='full',path_to_models:str='') -> pd.DataFrame:
     '''
     This function predicts the major class or sub class of a list of sequences using the TransfoRNA model.
     Additionaly, it can return logits, attention scores, similarity scores, gene embeddings or umap embeddings.
@@ -93,25 +91,27 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     assert sum([logits_flag,attention_flag,similarity_flag,embedds_flag,umap_flag]) <= 1, 'One option at most can be True'
     # capitalize the first letter of the model and the first letter after the -
     model = "-".join([word.capitalize() for word in model.split("-")])
-    cfg = read_inference_model_config(model,mc_or_sc,trained_on,path_to_id_models)
-    cfg = update_config_with_inference_params(cfg,mc_or_sc,trained_on,path_to_id_models)
+    cfg = read_inference_model_config(model,mc_or_sc,trained_on,path_to_models)
+    cfg = update_config_with_inference_params(cfg,mc_or_sc,trained_on,path_to_models)
     root_dir = Path(__file__).parents[1].absolute()
 
     with redirect_stdout(None):
         cfg, net = get_model(cfg, root_dir)
+        #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
         infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net = infer_from_pd(cfg, net, infer_pd, SeqTokenizer,attention_flag)
+        predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net,_  = infer_from_pd(cfg, net, infer_pd, SeqTokenizer,attention_flag)
 
         if model == 'Seq':
             gene_embedds_df = gene_embedds_df.iloc[:,:int(gene_embedds_df.shape[1]/2)]
-
+    if logits_flag:
+        cfg['log_logits'] = True
     prepare_inference_results_tcga(cfg, predicted_labels, logits, all_data, max_len)
     infer_pd = all_data["infere_rna_seq"]
 
     if logits_flag:
         logits_df = infer_pd.rename_axis("Sequence").reset_index()
-        logits_cols = [col for col in logits_df.columns if "Logits" in col]
-        logits_df = logits_df[logits_cols]
+        logits_cols = [col for col in infer_pd.columns if "Logits" in col]
+        logits_df = infer_pd[logits_cols]
         logits_df.columns = pd.MultiIndex.from_tuples(logits_df.columns, names=["Logits", "Sub Class"])
         logits_df.columns = logits_df.columns.droplevel(0)
         return logits_df
@@ -150,7 +150,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             #assign top_5_seqs list to df column
             sim_df[f'Explanatory Sequence'] = top_n_seqs
             sim_df['NLD'] = lev_dist
-            sim_df['Labels'] = top_n_labels
+            sim_df['Explanatory Label'] = top_n_labels
             sim_df['Novelty Threshold'] = lv_threshold
             #for every query sequence, order the NLD in a increasing order
             sim_df = sim_df.sort_values(by=['Sequence','NLD'],ascending=[False,True])
@@ -159,6 +159,8 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         logger.info(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
         #for every n_sim elements in the list, get the smallest levenstein distance 
         lv_dist_closest = [min(lev_dist[i:i+n_sim]) for i in range(0,len(lev_dist),n_sim)]
+        top_n_labels_closest = [top_n_labels[i:i+n_sim][np.argmin(lev_dist[i:i+n_sim])] for i in range(0,len(lev_dist),n_sim)]
+        top_n_seqs_closest = [top_n_seqs[i:i+n_sim][np.argmin(lev_dist[i:i+n_sim])] for i in range(0,len(lev_dist),n_sim)]
         infer_pd['Is Familiar?'] = [True if lv<lv_threshold else False for lv in lv_dist_closest]
 
         if umap_flag:
@@ -170,19 +172,23 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             gene_embedds_df = pd.DataFrame(umap.fit_transform(scaled_embedds),columns=['UMAP1','UMAP2'])
             gene_embedds_df['Net-Label'] = infer_pd['Net-Label'].values
             gene_embedds_df['Is Familiar?'] = infer_pd['Is Familiar?'].values
+            gene_embedds_df['Explanatory Label'] = top_n_labels_closest
+            gene_embedds_df['Explanatory Sequence'] = top_n_seqs_closest
             gene_embedds_df['Sequence'] = infer_pd.index
             return gene_embedds_df
 
         #override threshold
         infer_pd['Novelty Threshold'] = lv_threshold
         infer_pd['NLD'] = lv_dist_closest
+        infer_pd['Explanatory Label'] = top_n_labels_closest
+        infer_pd['Explanatory Sequence'] = top_n_seqs_closest
         infer_pd = infer_pd.round({"NLD": 2, "Novelty Threshold": 2})
         logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
 
 def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_class',logits_flag: bool = False, attention_flag: bool = False,\
         similarity_flag: bool = False, n_sim:int = 3,
-        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full",path_to_id_models:str='') -> pd.DataFrame:
+        embedds_flag:bool=False, umap_flag:bool = False, trained_on:str="full",path_to_models:str='') -> pd.DataFrame:
     """
     Predicts the labels of the sequences using all the models available in the transforna package.
     If non of the flags are true, it constructs and aggrgates the output of the ensemble model.
@@ -210,7 +216,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_clas
     df = None
     for model in models:
         logger.info(model)
-        df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_id_models = path_to_id_models)
+        df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_models = path_to_models)
         df_["Model"] = model
         df = pd.concat([df, df_], axis=0)
     #aggregate ensemble model if not of the flags are true

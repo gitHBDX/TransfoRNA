@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from anndata import AnnData
+from Bio.SeqIO.FastaIO import SimpleFastaParser
 
 logger = logging.getLogger(__name__)
 
@@ -313,7 +314,7 @@ def load(path: str, ext: str = None, **kwargs):
         return yaml.load(open(path), Loader=yaml.SafeLoader)
     # AnnData
     elif ext == "h5ad":
-        ad = anndata.read_h5ad(path, **kwargs)
+        ad = anndata.read_h5ad(path)
         cast_anndata(ad)
         return ad
     # Excel files ⇒ DataFrame
@@ -323,5 +324,16 @@ def load(path: str, ext: str = None, **kwargs):
     elif ext == "txt":
         with open(path, "r") as text_file:
             return text_file.read()
+    #fasta
+    elif ext == "fa":
+        ## load sequences
+        with open(path) as fasta_file:
+            identifiers = []
+            seqs = []
+            for title, sequence in SimpleFastaParser(fasta_file):
+                identifiers.append(title.split(None, 1)[0])
+                seqs.append(sequence)
+        #convert sequences to dataframe
+        return pd.DataFrame({'Sequences':seqs})
     else:
         raise NotImplementedError

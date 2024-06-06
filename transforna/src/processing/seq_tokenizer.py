@@ -21,11 +21,12 @@ class SeqTokenizer:
     '''
     def __init__(self,seqs_dot_bracket_labels: pd.DataFrame, config: DictConfig):
 
-        self.seqs_dot_bracket_labels = seqs_dot_bracket_labels
+        self.seqs_dot_bracket_labels = seqs_dot_bracket_labels.reset_index(drop=True)
         #shuffle
-        self.seqs_dot_bracket_labels = self.seqs_dot_bracket_labels\
-            .sample(frac=1)\
-            .reset_index(drop=True)
+        if not config["inference"]:
+            self.seqs_dot_bracket_labels = self.seqs_dot_bracket_labels\
+                .sample(frac=1)\
+                .reset_index(drop=True)
         
         #get input of model
         self.model_input = config["model_config"].model_input
@@ -172,7 +173,7 @@ class SeqTokenizer:
 
             sample_token = np.array(sample_token)
             samples_tokenized.append(sample_token)
-        # save vocab
+
         return (np.array(samples_tokenized), np.array(sample_token_ids))
     
     def tokenize_secondary_structure(self, window,sequences_to_be_tokenized,inference:bool=False,tokenizer= "overlap") -> np.ndarray:
@@ -281,9 +282,7 @@ class SeqTokenizer:
         #save token dicts
         save(data = self.second_input_tokens_ids_dict,path = os.getcwd()+'/second_input_tokens_ids_dict')
         save(data = self.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
-        #save token dicts
-        save(data = self.second_input_tokens_ids_dict,path = os.getcwd()+'/second_input_tokens_ids_dict')
-        save(data = self.seq_tokens_ids_dict,path = os.getcwd()+'/seq_tokens_ids_dict')
+
 
     def get_tokenized_data(self,inference:bool=False):
         #tokenize sequences

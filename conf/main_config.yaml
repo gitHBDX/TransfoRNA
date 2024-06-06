@@ -1,8 +1,7 @@
 defaults: 
   - model: transforna
   - inference_settings: default
-  #- override /hydra/hydra_logging@_group_: none
-  - override hydra/job_logging: custom
+  - override hydra/job_logging: disabled
 
 task: tcga # tcga,sncrna or premirna or custom (for a custom dataset)
 
@@ -15,9 +14,9 @@ model_config:
 
 #train settings
 model_name: seq #seq, seq-seq, seq-struct, seq-reverse, or baseline
-trained_on: id #full or id
-path_to_id_models: /nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/ #will be used if trained_on is full
-inference: False   # True or False
+trained_on: full #full(production, more coverage) or id (for test/eval purposes)
+path_to_models: /nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/ #edit path to point to models/tcga/ directory: will be used if trained_on is full
+inference: False   # Should TransfoRNA be used for inference or train? True or False
 #if inference is true, should the logits be logged?
 log_logits: False
 
@@ -27,7 +26,7 @@ valid_size: 0.15   # 0 < valid_size < 1
 
 #CV
 cross_val: True    # True or False
-num_replicates: 1  # Integer, num_replicates > 1
+num_replicates: 1  # Integer, num_replicates for cross-validation
 
 #seed
 seed: 1            # Integer
@@ -42,10 +41,9 @@ tensorboard: False  # True or False
 hydra:  
   run:  
     dir: ./outputs/${now:%Y-%m-%d}/${model_name}
-  #./outputs2/
   searchpath: 
    - file:///nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/conf
-#  output_subdir: null  
+#  output_subdir: null  #uncomment to disable hydra output
 
 
 

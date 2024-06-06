@@ -29,14 +29,14 @@ class IDModelAugmenter:
     def __init__(self,df:pd.DataFrame,config:Dict):
         self.df = df
         self.config = config
-        self.mapping_dict = load(config['train_config'].mapping_dict_path)
+        self.mapping_dict = load(config['train_config']['mapping_dict_path'])
 
 
     def predict_transforna_na(self) -> Tuple:
         infer_pd = pd.DataFrame(columns=['Sequence','Net-Label','Is Familiar?'])
 
-        mc_or_sc = 'major_class' if 'major_class' in self.config['model_config'].clf_target else 'sub_class'
-        inference_config = update_config_with_inference_params(self.config,mc_or_sc=mc_or_sc,path_to_id_models=self.config['path_to_id_models'])
+        mc_or_sc = 'major_class' if 'major_class' in self.config['model_config']['clf_target'] else 'sub_class'
+        inference_config = update_config_with_inference_params(self.config,mc_or_sc=mc_or_sc,path_to_models=self.config['path_to_models'])
         model_path = inference_config['inference_settings']["model_path"]
         logger.info(f"Augmenting hico sequences based on predictions from model at: {model_path}")
 
@@ -50,12 +50,13 @@ class IDModelAugmenter:
         with redirect_stdout(None):
             root_dir = Path(__file__).parents[3].absolute()
             inference_config, net = get_model(inference_config, root_dir)
-            infer_pd = pd.Series(sequences, name="Sequences").to_frame()
+            #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
+            original_infer_pd = pd.Series(sequences, name="Sequences").to_frame()
             logger.info(f'predicting sub classes for the NA set by the ID models')
-            predicted_labels, logits,_, _,all_data, max_len, net = infer_from_pd(inference_config, net, infer_pd, SeqTokenizer)
+            predicted_labels, logits,_, _,all_data, max_len, net, infer_pd = infer_from_pd(inference_config, net, original_infer_pd, SeqTokenizer)
 
 
-        prepare_inference_results_tcga(inference_config, predicted_labels, logits, all_data, max_len)
+        prepare_inference_results_tcga(inference_config,predicted_labels, logits, all_data, max_len)
         infer_pd = all_data["infere_rna_seq"]
             
         #compute lev distance for embedds and 

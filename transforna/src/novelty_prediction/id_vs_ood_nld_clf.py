@@ -199,14 +199,17 @@ def compute_nlds(embedds_path):
     fig.write_html(f'{results.figures_path}/lev_distance_distribution.html')
     fig.write_image(f'{results.figures_path}/lev_distance_distribution.png')
 
-    #get rows of lev_dist_df from ood split and from test split
-    artificial_affix_df = lev_dist_df[lev_dist_df['split'] == 'artificial_affix_df']
+    #get rows of lev_dist_df from ood/artificial_affix split and from test split
+    if 'ood_df' in lev_dist_df['split'].values: #for ID models
+        novel_df = lev_dist_df[lev_dist_df['split'] == 'ood_df']
+    else:#for FULL models as all classes are used for training: no OOD
+        novel_df = lev_dist_df[lev_dist_df['split'] == 'artificial_affix_df']
     test_df = lev_dist_df[lev_dist_df['split'] == 'test_df']
     
     lev_dist_df.to_csv(f'{results.analysis_path}/lev_dist_df.csv')
    
     #compute novelty clf metrics
-    compute_novelty_clf_metrics(results,test_df['lev_dist'].values,artificial_affix_df['lev_dist'].values)
+    compute_novelty_clf_metrics(results,test_df['lev_dist'].values,novel_df['lev_dist'].values)
 
 
 

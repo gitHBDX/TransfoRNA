@@ -53,7 +53,7 @@ num_replicates=5
 
 ############train major_class_hico
 
-#replace clf_target:str = 'sub_class_hico' to clf_target:str = 'major_class_hico' in ../conf/train_model_configs/tcga.py
+##replace clf_target:str = 'sub_class_hico' to clf_target:str = 'major_class_hico' in ../conf/train_model_configs/tcga.py
 sed -i "s/clf_target:str = 'sub_class_hico'/clf_target:str = 'major_class_hico'/g" conf/train_model_configs/tcga.py
 #print the file content
 cat conf/train_model_configs/tcga.py
@@ -62,7 +62,7 @@ for i in ${!models[@]}; do
     echo "Training model ${models_capitalized[$i]} for id on major_class"
     train_model ${models[$i]} id ${models_capitalized[$i]} $num_replicates "major_class"
     echo "Training model ${models[$i]} for full on major_class"
-    train_model ${models[$i]} full ${models_capitalized[$i]} $num_replicates "major_class"
+    train_model ${models[$i]} full ${models_capitalized[$i]} 1 "major_class"
 done
 
 
@@ -75,6 +75,6 @@ for i in ${!models[@]}; do
     echo "Training model ${models_capitalized[$i]} for id on sub_class"
     train_model ${models[$i]} id ${models_capitalized[$i]} $num_replicates "sub_class"
     echo "Training model ${models[$i]} for full on sub_class"
-    train_model ${models[$i]} full ${models_capitalized[$i]} $num_replicates "sub_class"
+    train_model ${models[$i]} full ${models_capitalized[$i]} 1 "sub_class"
 done
 
