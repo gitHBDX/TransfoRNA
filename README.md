@@ -5,7 +5,22 @@ for **human small RNAs and RNA fragments**. These are typically detected by RNA-
 
 TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. Using TransfoRNA's framewok, the high confidence annotations in the TCGA dataset can be increased by 3 folds.
 
- 
+Downloading the data used for training and the trained models can be done from [here](https://www.dropbox.com/scl/fo/hg3vbw3hzbvyuuhu4fjc6/ALrZ6rUe_9qcKqNgN5Lq7Hg?rlkey=bv40dlw2r4n5wu5adbsxklun0&e=1&dl=0).
+
+ ## Data Availability
+  The data folder wil be containing three subfolders (should be kept on the same folder level as `transforna`):
+  - `data`:  Contains three files:
+    - `TCGA__ngs__miRNA_log2RPM-24.06.0.h5ad` anndata with ~75k sequences and `var` columns containing the knowledge based annotations. 
+    - `HBDXBase.csv` containing a list of RNA precursors which are then used for data augmentation. 
+    - `subclass_to_annotation.json` holds mappings for every sub-class to major-class.
+      
+  The models folders contains both benchmark and models trained on tcga.
+  - `models`: 
+    - `benchmark` : contains benchmark models trained on sncRNA and premiRNA data. (See additional datasets at the bottom)
+    - `tcga`: All models trained on the TCGA data; `TransfoRNA_ID` (for testing and validation) and `TransfoRNA_FULL` (the production version) containing  higher RNA major and sub-class coverage. Each of the two folders contain all the models trained seperately on major-class and sub-class.
+  - `kba_pipeline`: contains mapping reference data required to run the knowledge based pipeline manually
+
+
 ## Dataset (Objective):
 - **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs classification performance 
   - Sequences are annotated based on a knowledge-based annotation approach that provides annotations for ~2k different sub-classes belonging to 11 major classes.
@@ -40,19 +55,6 @@ There are 5 classifier models currently available, each with different input rep
 
 <img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
 
-## Data Availability
-Downloading the data and the models can be done from [here](https://www.dropbox.com/sh/y7u8cofmg41qs0y/AADvj5lw91bx7fcDxghMbMtsa?dl=0). 
-
-This will download three subfolders that should be kept on the same folder level as `src`:
-  - `data`:  Contains three files:
-    - `TCGA` anndata with ~75k sequences and `var` columns containing the knowledge based annotations. 
-    - `HBDXBase.csv` containing a list of RNA precursors which are then used for data augmentation. 
-    - `subclass_to_annotation.json` holds mappings for every sub-class to major-class.
-
-  - `models`: 
-    - `benchmark` : contains benchmark models trained on sncRNA and premiRNA data. (See additional datasets at the bottom)
-    - `tcga`: All models trained on the TCGA data; `TransfoRNA_ID` (for testing and validation) and `TransfoRNA_FULL` (the production version) containing  higher RNA major and sub-class coverage. Each of the two folders contain all the models trained seperately on major-class and sub-class.
-  - `kba_pipeline`: contains mapping reference data required to run the knowledge based pipeline manually
 ## Repo Structure
 - configs: Contains the configurations of each model, training and inference settings.
  
