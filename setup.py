@@ -32,7 +32,9 @@ setup(
         "skorch==0.12.1",
         "torch==1.10.1",
         "tensorboard==2.16.2",
-        "Levenshtein==0.21.0"
+        "Levenshtein==0.21.0",
+        "huggingface_hub==0.23.3",
+        "transformers==4.41.2"
     ],
     python_requires='>=3.9',
     #move yaml files to package

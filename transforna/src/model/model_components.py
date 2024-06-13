@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch.nn.modules.normalization import LayerNorm
+from huggingface_hub import PyTorchModelHubMixin
+
 
 logger = logging.getLogger(__name__)
 
@@ -348,11 +350,13 @@ class RNATransformer(nn.Module):
             embedds = torch.flatten(embedds,start_dim=1)
             return embedds,None
 
-class GeneEmbeddModel(nn.Module):
+class GeneEmbeddModel(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self, main_config: DictConfig,
     ):
-        super().__init__()
+        super().__init__()#config=main_config)
+        if not isinstance(main_config,DictConfig):
+            main_config = DictConfig(main_config)
         self.train_config = main_config["train_config"]
         self.model_config = main_config["model_config"]
         self.device = self.train_config.device
@@ -428,9 +432,13 @@ class GeneEmbeddModel(nn.Module):
             x[:, : self.tokens_len].type(long_tensor)
         )
         attn_scores_second = None
-        second_input_embedd,attn_scores_second = self.second_input_model(
-                    x[:, self.tokens_len :-1].type(long_tensor)
-                )
+        try:
+            second_input_embedd,attn_scores_second = self.second_input_model(
+                        x[:, self.tokens_len :-1].type(long_tensor)
+                    )
+        except:
+            second_input_embedd = gene_embedd
+            pass
 
         #for tcga: if seq or baseline
         if self.num_transformers == 1:
