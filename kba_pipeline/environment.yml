@@ -16,4 +16,5 @@ dependencies:
   - samtools=1.16.1
   - tqdm
   - viennarna=2.5.1
+  - levenshtein
   - pip
