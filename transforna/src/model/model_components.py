@@ -2,7 +2,7 @@
 import logging
 import math
 import random
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import numpy as np
 import torch
@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from omegaconf import DictConfig
 from torch.nn.modules.normalization import LayerNorm
 from huggingface_hub import PyTorchModelHubMixin
-
+#from ..novelty_prediction.id_vs_ood_nld_clf import get_closest_neighbors,get_lev_dist
 
 logger = logging.getLogger(__name__)
 
@@ -354,11 +354,12 @@ class GeneEmbeddModel(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self, main_config: DictConfig,
     ):
-        super().__init__()#config=main_config)
-        if not isinstance(main_config,DictConfig):
-            main_config = DictConfig(main_config)
-        self.train_config = main_config["train_config"]
-        self.model_config = main_config["model_config"]
+        super().__init__()
+
+        self.main_config = main_config
+        self.train_config = DictConfig(main_config["train_config"])
+        self.model_config = DictConfig(main_config["model_config"])
+
         self.device = self.train_config.device
         self.model_input = self.model_config["model_input"]
         self.false_input_perc = self.model_config["false_input_perc"]
@@ -401,7 +402,21 @@ class GeneEmbeddModel(nn.Module, PyTorchModelHubMixin):
                 self.dropout = nn.Dropout(0.6)
 
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
+    #NOTE: if novelty prediction is to be available through huggingface model hub, this method should be implemented
+    
+    #def compute_novelty(self, embedds:torch.Tensor,query_seqs:List[str],num_neighbors:int):
+    #    top_n_seqs,top_n_labels,distances = get_closest_neighbors(self.main_config["results_handler"],embedds,num_neighbors)
+    #    #get levenstein distance
+    #    #for each split_seqs duplicate it num_neighbors times
+    #    query_seqs = [seq for seq in query_seqs for _ in range(num_neighbors)]
+    #    lev_dist = get_lev_dist(query_seqs,top_n_seqs)
+    #    return query_seqs,top_n_seqs,top_n_labels,distances,lev_dist
+    
+    def convert_ids_to_labels(self, class_ids:List[int]):
+        return [self.main_config["model_config"]["class_mappings"][int(c)] for c in class_ids]
 
+    def convert_subclass_to_majorclass(self,sub_class_labels:List[str]):
+        return [self.main_config["mapping_dict"][c] for c in sub_class_labels]
 
     def distort_input(self,x):
         for sample_idx in range(x.shape[0]):
