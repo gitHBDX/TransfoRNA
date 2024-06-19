@@ -36,7 +36,7 @@ dependencies = [
 transforna = ["*.yaml"]
 
 [tool.setuptools.packages.find]
-where = ["transforna"]
+where = ["TransfoRNA"]
 include = ["*"]
 
 [project.scripts]
