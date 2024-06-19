@@ -34,7 +34,8 @@ setup(
         "tensorboard==2.16.2",
         "Levenshtein==0.21.0",
         "huggingface_hub==0.23.3",
-        "transformers==4.41.2"
+        "transformers==4.41.2",
+        "biopython==1.78",
     ],
     python_requires='>=3.9',
     #move yaml files to package
