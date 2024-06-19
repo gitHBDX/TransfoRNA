@@ -34,5 +34,9 @@ dependencies = [
 [tool.setuptools.package-data]
 transorna = ["*.yaml"]
 
+[tool.setuptools.packages]
+where = ["transforna"]
+include = ["transforna*"]
+
 [project.scripts]
 "transforna" = "transforna.__main__:main"
