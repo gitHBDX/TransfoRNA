@@ -37,7 +37,7 @@ transforna = ["*.yaml"]
 
 [tool.setuptools.packages.find]
 where = ["transforna"]
-include = ["transforna.*"]
+include = ["transforna","transforna.*"]
 
 [project.scripts]
 "transforna" = "transforna.__main__:main"
