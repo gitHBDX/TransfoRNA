@@ -12,6 +12,13 @@ Downloading the data used for training and the trained models can be done from [
 - [Dataset](#dataset)
 - [Models](#models)
 - [Repo Structure](#repo-structure)
+- [Installation from source](#installation-from-source)
+- [Installation using pip](#installation-using-pip)
+- [TransfoRNA from repo](#inference-from-repo)
+- [Inference from huggingface](#inference-from-hugginface)
+- [Train TransfoRNA on custom Data](#train-on-custom-data)
+- [Additional Dataset (Benchmarks)](#additional-datasets)
+  
  ## Data Availability
   The data folder wil be containing three subfolders (should be kept on the same folder level as `transforna`):
   - `data`:  Contains three files:
@@ -98,7 +105,7 @@ There are 5 classifier models currently available, each with different input rep
 
   Check the script at `src/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
   
-## Inference
+## Inference from repo
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
   - `model_path`: The full path of the model. (currently this points to the Seq model)
@@ -160,8 +167,7 @@ The structure of the output folder is chosen by hydra to be `/day/time/results f
 - `figures`: some figures are saved containing the Normalized Levenstein Distance NLD, distribution per split.
 
 
-## Additional Datasets (Objective):
+## Additional Datasets:
 - sncRNA, collected from [RFam](https://rfam.org/) (classification of RNA precursors into 13 classes)
 - premiRNA [human miRNAs](http://www.mirbase.org)(classification of true vs pseudo precursors)
 
-### Place 2
