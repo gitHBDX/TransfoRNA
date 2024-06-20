@@ -37,6 +37,11 @@ setup(
         "transformers==4.41.2",
         "biopython==1.78",
     ],
+    #add dependency link for torch
+    dependency_links=[
+        "https://download.pytorch.org/whl/cu113/torch-1.10.1%2Bcu113-cp39-cp39-linux_x86_64.whl",
+        "https://download.pytorch.org/whl/cu113/torch_xla-1.10.1%2Bcu113-cp39-cp39-linux_x86_64.whl",
+    ],
     python_requires='>=3.9',
     #move yaml files to package
     package_data={'': ['*.yaml']},
