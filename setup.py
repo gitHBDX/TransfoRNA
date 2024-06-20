@@ -29,7 +29,7 @@ setup(
         "viennarna>=2.5.0a5",
         "scanpy==1.9.1",
         "scikit_learn==1.2.0",
-        "torch==1.10.1+cu113",
+        "torch==1.10.1",
         "skorch==0.12.1",
         "tensorboard==2.16.2",
         "Levenshtein==0.21.0",
@@ -39,9 +39,7 @@ setup(
     ],
     #add dependency link for torch
     dependency_links=[
-        "https://download.pytorch.org/whl/cu113/torch_stable.html",
         "https://download.pytorch.org/whl/cu113",
-        "https://download.pytorch.org/whl/cu113/torch-1.10.1%2Bcu113-cp39-cp39-linux_x86_64.whl"
     ],
     python_requires='>=3.9',
     #move yaml files to package

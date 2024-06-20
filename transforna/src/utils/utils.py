@@ -89,13 +89,16 @@ def update_dataclass_inference(cfg,dataset_class):
 
 def set_seed_and_device(seed:int = 0,device_no:int=0):
     # set seed
-    torch.backends.cudnn.deterministic = True
     random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
     np.random.seed(seed)
-    torch.cuda.set_device(device_no)
-    #CUDA_LAUNCH_BLOCKING=1 #for debugging
+    
+    if device_no >= 0:
+        torch.backends.cudnn.deterministic = True
+        torch.cuda.manual_seed(seed)
+        torch.cuda.set_device(device_no)
+
+        #CUDA_LAUNCH_BLOCKING=1 #for debugging
 
 def sync_skorch_with_config(skorch_cfg: DictConfig,cfg:DictConfig):
     '''

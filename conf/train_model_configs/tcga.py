@@ -62,7 +62,7 @@ class GeneEmbeddTrainConfig:
     dataset_path_train: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/TCGA__ngs__miRNA_log2RPM-24.06.0__var.csv'
     precursor_file_path: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/HBDxBase.csv'
     mapping_dict_path: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/subclass_to_annotation.json'
-    device: str = "cuda"
+    device: str = "cpu"
     l2_weight_decay: float = 0.05
     batch_size: int = 512
 

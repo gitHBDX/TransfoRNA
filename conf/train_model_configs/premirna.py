@@ -39,7 +39,7 @@ class GeneEmbeddTrainConfig:
     dataset_path_test: str = "/data/hbdx_ldap_local/analysis/data/premirna/test"
     datset_path_additional_testset: str = "/data/hbdx_ldap_local/analysis/data/premirna/"
     labels_mapping_path:str = "/data/hbdx_ldap_local/analysis/data/premirna/labels_mapping_dict.pkl"
-    device: str = "cuda"
+    device: str = "cpu"
     l2_weight_decay: float = 1e-5
     batch_size: int = 64
 
