@@ -230,7 +230,7 @@ def prepare_model_inference(cfg,path):
     net = instantiate_predictor(cfg["model"]["skorch_model"], cfg,path)
     net.initialize()
 
-    logger.info(f"Model loaded from {cfg['inference_settings']['model_path']}")
+    print(f"Model loaded from {cfg['inference_settings']['model_path']}")
     net.load_params(f_params=f'{cfg["inference_settings"]["model_path"]}')
     net.labels_mapping_dict = dict(zip(cfg["model_config"].class_mappings,list(np.arange(cfg["model_config"].num_classes))))
     #save embeddings

@@ -128,7 +128,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         results:Results_Handler = Results_Handler(embedds_path=embedds_path,splits=['train'])
         results.get_knn_model()
         lv_threshold = load(results.analysis_path+"/novelty_model_coef")["Threshold"]
-        logger.info(f'computing levenstein distance for the inference set')
+        print(f'computing levenstein distance for the inference set')
         #prepare infer split
         gene_embedds_df.columns = results.embedds_cols[:len(gene_embedds_df.columns)]
         #add index of gene_embedds_df to be a column with name results.seq_col
@@ -156,7 +156,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
             sim_df = sim_df.sort_values(by=['Sequence','NLD'],ascending=[False,True])
             return sim_df
         
-        logger.info(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
+        print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
         #for every n_sim elements in the list, get the smallest levenstein distance 
         lv_dist_closest = [min(lev_dist[i:i+n_sim]) for i in range(0,len(lev_dist),n_sim)]
         top_n_labels_closest = [top_n_labels[i:i+n_sim][np.argmin(lev_dist[i:i+n_sim])] for i in range(0,len(lev_dist),n_sim)]
@@ -165,7 +165,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
 
         if umap_flag:
             #compute umap
-            logger.info(f'computing umap for the inference set')
+            print(f'computing umap for the inference set')
             gene_embedds_df = gene_embedds_df.drop(results.seq_col,axis=1)
             umap = UMAP(n_components=2,random_state=42)
             scaled_embedds = StandardScaler().fit_transform(gene_embedds_df.values)
@@ -183,7 +183,7 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
         infer_pd['Explanatory Label'] = top_n_labels_closest
         infer_pd['Explanatory Sequence'] = top_n_seqs_closest
         infer_pd = infer_pd.round({"NLD": 2, "Novelty Threshold": 2})
-        logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
+        print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
 
 def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_class',logits_flag: bool = False, attention_flag: bool = False,\
@@ -215,7 +215,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_clas
         models = ["Seq", "Seq-Struct", "Seq-Rev"]
     df = None
     for model in models:
-        logger.info(model)
+        print(model)
         df_ = predict_transforna(sequences, model, mc_or_sc,logits_flag,attention_flag,similarity_flag,n_sim,embedds_flag,umap_flag,trained_on=trained_on,path_to_models = path_to_models)
         df_["Model"] = model
         df = pd.concat([df, df_], axis=0)
@@ -226,7 +226,7 @@ def predict_transforna_all_models(sequences: List[str], mc_or_sc:str = 'sub_clas
     now = datetime.now()
     after_time = now.strftime("%H:%M:%S")
     delta_time = datetime.strptime(after_time, "%H:%M:%S") - datetime.strptime(before_time, "%H:%M:%S")
-    logger.info(f"Time taken: {delta_time}")
+    print(f"Time taken: {delta_time}")
     
     return df
 

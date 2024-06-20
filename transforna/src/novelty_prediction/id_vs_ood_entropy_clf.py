@@ -148,9 +148,9 @@ def compute_logits_clf_metrics(results):
     f1_prc_score = sum(f1s_prc)/len(f1s_prc)
     f1_prc_std = np.std(f1s_prc)
 
-    logger.info(f"auc roc is {auc_roc_score} +- {auc_roc_std}")
-    logger.info(f"auc prc is {auc_prc_score} +- {auc_prc_std}")
-    logger.info(f"f1 prc is {f1_prc_score} +- {f1_prc_std}")
+    print(f"auc roc is {auc_roc_score} +- {auc_roc_std}")
+    print(f"auc prc is {auc_prc_score} +- {auc_prc_std}")
+    print(f"f1 prc is {f1_prc_score} +- {f1_prc_std}")
 
     logits_clf_metrics = {"AUC ROC score": auc_roc_score,\
         "auc_roc_std": auc_roc_std,\
@@ -165,7 +165,7 @@ def compute_logits_clf_metrics(results):
         save(data = logits_clf_metrics,path=results.analysis_path+"/logits_clf_metrics.yaml")
 
 def compute_entropies(embedds_path):
-    logger.info("Computing entropy for ID vs OOD:")
+    print("Computing entropy for ID vs OOD:")
     #######################################TO CONFIGURE#############################################
     #embedds_path = ''#f'models/tcga/TransfoRNA_{trained_on.upper()}/sub_class/{model}/embedds' #edit path to contain path for the embedds folder, for example: transforna/results/seq-rev/embedds/
     splits = ['train','valid','test','ood','artificial','no_annotation']
@@ -191,11 +191,11 @@ def compute_entropies(embedds_path):
     compute_logits_clf_metrics(results)
 
     test_whisker_UB = plot_entropy(results)
-    logger.info("plotting entropy per unique length")
+    print("plotting entropy per unique length")
     plot_entropy_per_unique_length(results,'artificial_affix')
-    logger.info('plotting entropy per unique length for ood')
+    print('plotting entropy per unique length for ood')
     #decompose outliers in ID
-    logger.info("plotting outliers")
+    print("plotting outliers")
     plot_outliers(results,test_whisker_UB)
 
 

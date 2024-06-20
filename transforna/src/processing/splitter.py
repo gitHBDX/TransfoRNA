@@ -192,7 +192,7 @@ class DataSplitter:
         num_samples = self.splits_df_dict['train_df'].shape[0]
         num_classes = len(self.splits_df_dict['train_df'].Labels.value_counts()[self.splits_df_dict['train_df'].Labels.value_counts()>0])
         #log
-        logger.info(f'Training with {num_classes} classes and {num_samples} samples')
+        print(f'Training with {num_classes} classes and {num_samples} samples')
 
         #get features, labels, and seqs per split
         splits_features_dict = self.get_features_per_split()

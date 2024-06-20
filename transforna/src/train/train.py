@@ -23,7 +23,7 @@ def compute_cv(cfg:DictConfig,path:str,output_dir:str):
 
     summary_pd = pd.DataFrame(index=np.arange(cfg["num_replicates"]),columns = ['B. Acc','Dur'])
     for seed_no in range(cfg["num_replicates"]):
-        logger.info(f"Currently training replicate {seed_no}")
+        print(f"Currently training replicate {seed_no}")
         cfg["seed"] = seed_no
         test_score,net = train(cfg,path=path,output_dir=output_dir)                
         convrg_epoch = np.where(net.history[:,'val_acc_best'])[0][-1]

@@ -38,7 +38,7 @@ def main(cfg: DictConfig) -> None:
 
     #inference or train
     if cfg["inference"]:
-        logger.info(f"Started inference on {cfg['task']}")
+        print(f"Started inference on {cfg['task']}")
         if cfg['task'] == 'tcga':
             return infer_tcga(cfg,path=path)
         else:

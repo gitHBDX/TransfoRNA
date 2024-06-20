@@ -284,7 +284,7 @@ class Net(skorch.NeuralNet):
             msg = self._format_reinit_msg(
                 "optimizer", kwargs, triggered_directly=triggered_directly
             )
-            logger.info(msg)
+            print(msg)
 
         self.optimizer_ = self.optimizer(args, lr=kwargs["lr"])
 

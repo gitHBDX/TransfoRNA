@@ -401,7 +401,7 @@ class GeneEmbeddModel(nn.Module, PyTorchModelHubMixin):
                 self.BN = nn.BatchNorm1d(num_nodes)
                 self.dropout = nn.Dropout(0.6)
 
-        logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
+        print("number of parameters: %e", sum(p.numel() for p in self.parameters()))
     #NOTE: if novelty prediction is to be available through huggingface model hub, this method should be implemented
 
     #def compute_novelty(self, embedds:torch.Tensor,query_seqs:List[str],num_neighbors:int):

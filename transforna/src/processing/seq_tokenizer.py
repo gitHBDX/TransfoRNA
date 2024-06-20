@@ -73,7 +73,7 @@ class SeqTokenizer:
         inlier_lengths = np.sort(lengths_arr[in_distribution].unique())
         self.max_length = int(np.max(inlier_lengths))
         self.min_length = int(np.min(inlier_lengths))
-        logger.info(f'maximum and minimum sequence length is set to: {self.max_length} and {self.min_length}')
+        print(f'maximum and minimum sequence length is set to: {self.max_length} and {self.min_length}')
         return 
     
 
@@ -86,7 +86,7 @@ class SeqTokenizer:
 
         num_longer_seqs = sum(df['Sequences'].str.len()>self.max_length)
         if num_longer_seqs:
-            logger.info(f"Number of sequences to be trimmed: {num_longer_seqs}")
+            print(f"Number of sequences to be trimmed: {num_longer_seqs}")
 
 
         for idx,seq in enumerate(df['Sequences']):
@@ -100,7 +100,7 @@ class SeqTokenizer:
         #delete min sequences
         if len(min_to_be_deleted):
             df = df.drop(min_to_be_deleted).reset_index(drop=True)
-            logger.info(f"Number of sequences shroter sequences to be removed: {len(min_to_be_deleted)}")
+            print(f"Number of sequences shroter sequences to be removed: {len(min_to_be_deleted)}")
         self.seqs_dot_bracket_labels = df
     
     def get_secondary_structure(self,sequences):
@@ -288,9 +288,9 @@ class SeqTokenizer:
         #tokenize sequences
         samples_tokenized,sample_token_ids = self.tokenize_samples(self.window,self.seq,inference)
 
-        logger.info(f'Vocab size for primary sequences: {len(self.seq_tokens_ids_dict.keys())}')
-        logger.info(f'Vocab size for secondary structure: {len(self.second_input_tokens_ids_dict.keys())}')
-        logger.info(f'Number of sequences used for tokenization: {samples_tokenized.shape[0]}')
+        print(f'Vocab size for primary sequences: {len(self.seq_tokens_ids_dict.keys())}')
+        print(f'Vocab size for secondary structure: {len(self.second_input_tokens_ids_dict.keys())}')
+        print(f'Number of sequences used for tokenization: {samples_tokenized.shape[0]}')
 
         #tokenize struct if used
         if "comp" in self.model_input:

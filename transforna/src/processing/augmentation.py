@@ -38,7 +38,7 @@ class IDModelAugmenter:
         mc_or_sc = 'major_class' if 'major_class' in self.config['model_config']['clf_target'] else 'sub_class'
         inference_config = update_config_with_inference_params(self.config,mc_or_sc=mc_or_sc,path_to_models=self.config['path_to_models'])
         model_path = inference_config['inference_settings']["model_path"]
-        logger.info(f"Augmenting hico sequences based on predictions from model at: {model_path}")
+        print(f"Augmenting hico sequences based on predictions from model at: {model_path}")
 
         #path should be infer_cfg["model_path"] - 2 level + embedds
         embedds_path = '/'.join(inference_config['inference_settings']["model_path"].split('/')[:-2])+'/embedds'
@@ -52,7 +52,7 @@ class IDModelAugmenter:
             inference_config, net = get_model(inference_config, root_dir)
             #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
             original_infer_pd = pd.Series(sequences, name="Sequences").to_frame()
-            logger.info(f'predicting sub classes for the NA set by the ID models')
+            print(f'predicting sub classes for the NA set by the ID models')
             predicted_labels, logits,_, _,all_data, max_len, net, infer_pd = infer_from_pd(inference_config, net, original_infer_pd, SeqTokenizer)
 
 
@@ -60,13 +60,13 @@ class IDModelAugmenter:
         infer_pd = all_data["infere_rna_seq"]
             
         #compute lev distance for embedds and 
-        logger.info('computing levenstein distance for the NA set by the ID models')
+        print('computing levenstein distance for the NA set by the ID models')
         _,_,_,_,_,lev_dist = get_closest_ngbr_per_split(results,'no_annotation')
             
-        logger.info(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
+        print(f'num of hico based on entropy novelty prediction is {sum(infer_pd["Is Familiar?"])}')
         infer_pd['Is Familiar?'] = [True if lv<threshold else False for lv in lev_dist]
         infer_pd['Threshold'] = threshold
-        logger.info(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
+        print(f'num of new hico based on levenstein distance is {np.sum(infer_pd["Is Familiar?"])}')
         return infer_pd.rename_axis("Sequence").reset_index()
         
     def include_id_model_predictions(self):
@@ -188,7 +188,7 @@ class PrecursorAugmenter:
             precursor_df = pd.read_csv(self.config['train_config'].precursor_file_path, index_col=0)
             return precursor_df
         except:
-            logger.info('Could not load precursor file')
+            print('Could not load precursor file')
             return None
         
     def compute_dynamic_bin_size(self,precursor_len:int, name:str=None) -> List[int]:
@@ -263,7 +263,7 @@ class PrecursorAugmenter:
                 xRNA_df.index = xRNA_df.index.str.replace('|','-', regex=False)
                 prec_row_df = xRNA_df.iloc[xRNA_df.index.str.contains(prec_name)]
                 if prec_row_df.empty:
-                    logger.info(f'precursor {prec_name} not found in HBDxBase')
+                    print(f'precursor {prec_name} not found in HBDxBase')
                     return pd.DataFrame()
     
             prec_row_df = prec_row_df.iloc[0]
@@ -373,7 +373,7 @@ class PrecursorAugmenter:
                     sc_mc_mapper = lambda x: 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else None
                     mc = sc_mc_mapper(sc)
                     if mc is None:
-                        logger.info(f'No mapping for {sc}')
+                        print(f'No mapping for {sc}')
                         continue
                 existing_seqs = self.df[self.df['Labels'] == sc].index
                 scs_list.append(sc)
@@ -412,7 +412,7 @@ class DataAugmenter:
         self.mapping_dict = load(config['train_config'].mapping_dict_path)
         self.trained_on = config.trained_on
         self.clf_target = config['model_config'].clf_target
-        logger.info(f'Augmenting the dataset for {self.clf_target}')
+        print(f'Augmenting the dataset for {self.clf_target}')
         self.set_labels()
 
         self.precursor_augmenter = PrecursorAugmenter(self.df,self.config)
@@ -443,7 +443,7 @@ class DataAugmenter:
         duplicated_df = new_var_df[new_var_df.index.isin(self.df.index)]
         #log
         if len(duplicated_df):
-            logger.info(f'Number of duplicated sequences to be removed augmented data: {duplicated_df.shape[0]}')
+            print(f'Number of duplicated sequences to be removed augmented data: {duplicated_df.shape[0]}')
 
         new_var_df = new_var_df[~new_var_df.index.isin(self.df.index)].sample(frac=1)
 

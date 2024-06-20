@@ -106,7 +106,7 @@ def save(path: Path, data: object, ignore_ext: bool = False) -> Path:
             if "datetime" in data.obs[date_col].dtype.name:
                 data.obs[date_col] = data.obs[date_col].dt.strftime("%Y-%m-%d")
             else:
-                logger.info(f"Column {date_col} in obs should be a date but isnt formatted as one.")
+                print(f"Column {date_col} in obs should be a date but isnt formatted as one.")
         data.write(path)
     # Strings to normal files
     elif isinstance(data, str):

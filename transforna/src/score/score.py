@@ -28,7 +28,7 @@ def infere_additional_test_data(net,data):
         predictions = net.predict(data[dataset_idx])
         correct = sum(torch.max(predictions,1).indices)
         total = len(torch.max(predictions,1).indices)
-        logger.info(f'The prediction on the {dataset_idx} dataset is {correct} out of {total}')
+        print(f'The prediction on the {dataset_idx} dataset is {correct} out of {total}')
 
 def get_rna_seqs(seq, model_config):
     rna_seqs = []
@@ -155,12 +155,12 @@ def get_split_score(net,split_data:torch.Tensor,split_labels:torch.Tensor,split:
     if split_labels is not None:
         split_score = sum(split_acc)/len(split_acc)
         if mirna_flag is not None:
-            logger.info(f"{split} accuracy score is {split_score} for mirna: {mirna_flag}")
+            print(f"{split} accuracy score is {split_score} for mirna: {mirna_flag}")
     else:
         #only for inference
         split_score = None
             
-        logger.info(f"{split} accuracy score is {split_score}")
+        print(f"{split} accuracy score is {split_score}")
     
     return split_score,predicted_labels_str
 
@@ -212,7 +212,7 @@ def generate_embedding(net, path:str,accuracy_sore,data, data_seq,labels,labels_
     score_avg = 0
     if split in ['train','valid','test']:
         score_avg = np.average(accuracy,weights = weights_per_batch)
-        logger.info(f"total accuracy score on {split} is {np.round(score_avg,4)}")
+        print(f"total accuracy score on {split} is {np.round(score_avg,4)}")
 
     
     if log_embedds:
@@ -257,7 +257,7 @@ def compute_score_tcga(
                 test_score = score
         except:
             trained_on = cfg['trained_on']
-            logger.info(f'Skipping {split} split, as split does not exist for models trained on {trained_on}!')
+            print(f'Skipping {split} split, as split does not exist for models trained on {trained_on}!')
             
         
             
