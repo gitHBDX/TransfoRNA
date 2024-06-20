@@ -75,15 +75,16 @@ There are 5 classifier models currently available, each with different input rep
 <img width="948" alt="Screenshot 2023-08-16 at 16 39 20" src="https://github.com/gitHBDX/TransfoRNA-Framework/assets/82571392/d7d092d8-8cbd-492a-9ccc-994ffdd5aa5f">
 
 ## Repo Structure
-- configs: Contains the configurations of each model, training and inference settings.
+`conf`: Contains the configurations of each model, training and inference settings.
  
-  The `conf/main_config.yaml` file offers options to change the task, the training settings and the logging. The following shows all the options and permitted values for each option.
+   The `conf/main_config.yaml` file offers options to change the task, the training settings and the logging. The following shows all the options and permitted values for each option.
 
-  <img width="835" alt="Screenshot 2024-05-22 at 10 19 15" src="https://github.com/gitHBDX/TransfoRNA/assets/82571392/225d2c98-ed45-4ca7-9e86-557a73af702d">
+   <img width="835" alt="Screenshot 2024-05-22 at 10 19 15" src="https://github.com/gitHBDX/TransfoRNA/assets/82571392/225d2c98-ed45-4ca7-9e86-557a73af702d">
 
-- transforna contains two folders:
-    - `src` folder which contains transforna package. View transforna's architecture [here](https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/src/readme.md).
-    - `bin` folder contains all scripts necessary for reproducing manuscript figures.
+`transforna` contains two folders:
+
+   - `src` folder which contains transforna package. View transforna's architecture [here](https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/src/readme.md).
+   - `bin` folder contains all scripts necessary for reproducing manuscript figures.
 
 ## Installation
 Installation could be done from source or using pip:
@@ -108,15 +109,17 @@ Installation could be done from source or using pip:
 
 ## Inference
 Models could be used for inference in one of three ways:
-- TransfoRNA API
-   In `transforna/src/inference/inference_api.py`, all the functionalities of transforna are offered as APIs. There are two functions of interest:
+- **TransfoRNA API**
+
+  In `transforna/src/inference/inference_api.py`, all the functionalities of transforna are offered as APIs. There are two functions of interest:
     - `predict_transforna` : Computes for a set of sequences and for a given model, one of various options; the embeddings, logits, explanatory (similar) sequences, attentions masks or umap coordinates. 
     - `predict_transforna_all_models`: Same as `predict_transforna` but computes the desired option for all the models as well as aggregates the output of the ensemble model.
     Both return a pandas dataframe containing the sequence along with the desired computation. 
   
     Check the script at `src/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
   
-- Inference from repo
+- **Inference from repo**
+
   For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
     - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
     - `model_path`: The full path of the model. (currently this points to the Seq model)
@@ -137,7 +140,8 @@ Models could be used for inference in one of three ways:
    - `(model_name)_inference_results.csv`: Contains columns; Net-Label containing predicted label and Is Familiar? boolean column containing the models' novelty predictor output. (True: familiar/ False: Novel)
      *Note: The output will also contain the logits of the model is `log_logits` in the `main_config` is `True`.* 
 
-- Inference from huggingface
+- **Inference from huggingface**
+
   TransfoRNA Models are uploaded to huggingface 🤗:
   [Seq](https://huggingface.co/HBDX/Seq-TransfoRNA)
   [Seq-Seq](https://huggingface.co/HBDX/Seq-Seq-TransfoRNA)
@@ -148,16 +152,17 @@ Models could be used for inference in one of three ways:
 
 ## Train
 TransfoRNA can be trained using input data as Anndata, csv or fasta. If the input is anndata, then `anndata.var` should contains all the sequences. Some changes has to be made (follow `configs/train_model_configs/tcga`):
-
+  
   In `configs/train_model_configs/custom`:
-    - `dataset_path_train` has to point to the input_data which should contain; a `sequence` column, a `small_RNA_class_annotation` coliumn indicating the major class if available (otherwise should be NaN), `five_prime_adapter_filter` specifies whether the sequence is considered a real sequence or an artifact (`True `for Real and `False` for artifact), a `subclass_name` column containing the sub-class name if available (otherwise should be NaN), and a boolean column `hico` indicating whether a sequence is high confidence or not.
-    - If sampling from the precursor is required in order to augment the sub-classes, the `precursor_file_path` should include precursors. Follow the scheme of the HBDxBase.csv and have a look at `PrecursorAugmenter` class in `transforna/src/processing/augmentation.py`
-    - `mapping_dict_path` should contain the mapping from sub class to major class. i.e: 'miR-141-5p' to 'miRNA'.
-    - `clf_target` sets the classification target of the mopdel and should be either `sub_class_hico` for training on targets in `subclass_name` or `major_class_hico` for training on targets in `small_RNA_class_annotation`. For both, only high confidence sequences are selected for training (based on `hico` column).
+  
+   - `dataset_path_train` has to point to the input_data which should contain; a `sequence` column, a `small_RNA_class_annotation` coliumn indicating the major class if available (otherwise should be NaN), `five_prime_adapter_filter` specifies whether the sequence is considered a real sequence or an artifact (`True `for Real and `False` for artifact), a `subclass_name` column containing the sub-class name if available (otherwise should be NaN), and a boolean column `hico` indicating whether a sequence is high confidence or not.
+   - If sampling from the precursor is required in order to augment the sub-classes, the `precursor_file_path` should include precursors. Follow the scheme of the HBDxBase.csv and have a look at `PrecursorAugmenter` class in `transforna/src/processing/augmentation.py`
+   - `mapping_dict_path` should contain the mapping from sub class to major class. i.e: 'miR-141-5p' to 'miRNA'.
+   - `clf_target` sets the classification target of the mopdel and should be either `sub_class_hico` for training on targets in `subclass_name` or `major_class_hico` for training on targets in `small_RNA_class_annotation`. For both, only high confidence sequences are selected for training (based on `hico` column).
     
-    In `configs/main_config`, some changes should be made:
-    - change `task` to `custom` or to whatever name the `custom.py` has been renamed.
-    - set the `model_name` as desired.
+   In `configs/main_config`, some changes should be made:
+   - change `task` to `custom` or to whatever name the `custom.py` has been renamed.
+   - set the `model_name` as desired.
   
 For training TransfoRNA from the root directory: 
 ```
