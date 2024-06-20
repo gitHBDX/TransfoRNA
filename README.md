@@ -115,11 +115,11 @@ After inference, an `inference_output` folder will be created under `outputs/` w
    *Note: The output will also contain the logits of the model is `log_logits` in the `main_config` is `True`.* 
 
 ## Inference from huggingface
-TransfRNA Models are uploaded to hugging face:
-[Seq](https://huggingface.co/Yak-hbdx/Seq-TransfoRNA)
-[Seq-Seq](https://huggingface.co/Yak-hbdx/Seq-Seq-TransfoRNA)
-[Seq-Struct](https://huggingface.co/Yak-hbdx/Seq-Struct-TransfoRNA)
-[Seq-Rev](https://huggingface.co/Yak-hbdx/Seq-Rev-TransfoRNA)
+TransfoRNA Models are uploaded to huggingface 🤗:
+[Seq](https://huggingface.co/HBDX/Seq-TransfoRNA)
+[Seq-Seq](https://huggingface.co/HBDX/Seq-Seq-TransfoRNA)
+[Seq-Struct](https://huggingface.co/HBDX/Seq-Struct-TransfoRNA)
+[Seq-Rev](https://huggingface.co/HBDX/Seq-Rev-TransfoRNA)
 
 refer to the script: `TransfoRNA/scripts/test_huggingface_transforna_model.ipynb` for an example.
 
