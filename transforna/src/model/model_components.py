@@ -403,7 +403,7 @@ class GeneEmbeddModel(nn.Module, PyTorchModelHubMixin):
 
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
     #NOTE: if novelty prediction is to be available through huggingface model hub, this method should be implemented
-    
+
     #def compute_novelty(self, embedds:torch.Tensor,query_seqs:List[str],num_neighbors:int):
     #    top_n_seqs,top_n_labels,distances = get_closest_neighbors(self.main_config["results_handler"],embedds,num_neighbors)
     #    #get levenstein distance
@@ -412,7 +412,8 @@ class GeneEmbeddModel(nn.Module, PyTorchModelHubMixin):
     #    lev_dist = get_lev_dist(query_seqs,top_n_seqs)
     #    return query_seqs,top_n_seqs,top_n_labels,distances,lev_dist
     
-    def convert_ids_to_labels(self, class_ids:List[int]):
+    def convert_ids_to_labels(self, activations:torch.Tensor):
+        class_ids = torch.argmax(activations,dim=1).numpy()
         return [self.main_config["model_config"]["class_mappings"][int(c)] for c in class_ids]
 
     def convert_subclass_to_majorclass(self,sub_class_labels:List[str]):
