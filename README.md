@@ -9,13 +9,10 @@ Embeddings of RNAs collected from two different [datasets](#datasets); TCGA and 
 TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. Using TransfoRNA's framewok, the high confidence annotations in the TCGA dataset can be increased by 3 folds.
 
 
-Downloading the data used for training and the trained models can be done from [here](https://www.dropbox.com/scl/fo/hg3vbw3hzbvyuuhu4fjc6/ALrZ6rUe_9qcKqNgN5Lq7Hg?rlkey=bv40dlw2r4n5wu5adbsxklun0&e=1&dl=0).
-
-
 
 ## Sections: 
-- [Visualize RNAs (External link)](https://www.transforna.com)
-- [Downloaded Folder](#downloaded-folder)
+- [Visualize RNAs](https://www.transforna.com) External link!
+- [Resources](#resources)
 - [Datasets](#datasets)
 - [Models](#models)
 - [Repo Structure](#repo-structure)
@@ -23,8 +20,10 @@ Downloading the data used for training and the trained models can be done from [
 - [Inference](#inference)
 - [Train](#train)
  
- ## Downloaded folder
-  The data folder wil be containing three subfolders (should be kept on the same folder level as `transforna`):
+ ## Resources
+ The data used for training and the trained models can be downloaded from [here](https://www.dropbox.com/scl/fo/hg3vbw3hzbvyuuhu4fjc6/ALrZ6rUe_9qcKqNgN5Lq7Hg?rlkey=bv40dlw2r4n5wu5adbsxklun0&e=1&dl=0).
+
+  The downloaded folder contains three subfolders (should be kept on the same folder level as `transforna`):
   - `data`:  Contains three files:
     - `TCGA__ngs__miRNA_log2RPM-24.06.0.h5ad` anndata with ~75k sequences and `var` columns containing the knowledge based annotations. 
     - `HBDXBase.csv` containing a list of RNA precursors which are then used for data augmentation. 
