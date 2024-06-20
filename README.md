@@ -66,7 +66,7 @@ There are 5 classifier models currently available, each with different input rep
     - `src` folder which contains transforna package. View transforna's architecture [here](https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/src/readme.md).
     - `bin` folder contains all scripts necessary for reproducing manuscript figures.
 
-## Installation
+## Installation from source
 
  The `install.sh` is a script that creates an transforna environment in which all the required packages for TransfoRNA are installed. Simply navigate to the root directory and run from terminal:
  
@@ -78,7 +78,13 @@ There are 5 classifier models currently available, each with different input rep
  #run script
  ./install.sh
  ```
+ ## Installation using pip
  
+ ```
+ #TODO: Change next line to pip install transforna, once package is on pypi
+ pip install git+ssh://git@github.com/gitHBDX/transforna.git
+ ```
+
 ## TransfoRNA API
  In `transforna/src/inference/inference_api.py`, all the functionalities of transforna are offered as APIs. There are two functions of interest:
   - `predict_transforna` : Computes for a set of sequences and for a given model, one of various options; the embeddings, logits, explanatory (similar) sequences, attentions masks or umap coordinates. 
@@ -87,7 +93,7 @@ There are 5 classifier models currently available, each with different input rep
 
   Check the script at `src/test_inference_api.py` for a basic demo on how to call the either of the APIs. 
   
-## Inference from terminal
+## Inference
 For inference, two paths in `configs/inference_settings/default.yaml` have to be edited:
   - `sequences_path`: The full path to a csv file containing the sequences for which annotations are to be inferred.
   - `model_path`: The full path of the model. (currently this points to the Seq model)
@@ -108,6 +114,14 @@ After inference, an `inference_output` folder will be created under `outputs/` w
  - `(model_name)_inference_results.csv`: Contains columns; Net-Label containing predicted label and Is Familiar? boolean column containing the models' novelty predictor output. (True: familiar/ False: Novel)
    *Note: The output will also contain the logits of the model is `log_logits` in the `main_config` is `True`.* 
 
+## Inference from huggingface
+TransfRNA Models are uploaded to hugging face:
+[Seq](https://huggingface.co/Yak-hbdx/Seq-TransfoRNA)
+[Seq-Seq](https://huggingface.co/Yak-hbdx/Seq-Seq-TransfoRNA)
+[Seq-Struct](https://huggingface.co/Yak-hbdx/Seq-Struct-TransfoRNA)
+[Seq-Rev](https://huggingface.co/Yak-hbdx/Seq-Rev-TransfoRNA)
+
+refer to the script: `TransfoRNA/scripts/test_huggingface_transforna_model.ipynb` for an example.
 
 ## Train on custom data
 TransfoRNA can be trained using input data as Anndata, csv or fasta. If the input is anndata, then `anndata.var` should contains all the sequences. Some changes has to be made (follow `configs/train_model_configs/tcga`):
