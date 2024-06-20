@@ -19,6 +19,7 @@ TransfoRNA can be trained on just the RNA sequences and optionally on additional
 - [Installation](#installation)
 - [Inference](#inference)
 - [Train](#train)
+- [Novelty Prediction](#novelty-prediction)
  
  ## Resources
  The data used for training and the trained models can be downloaded from [here](https://www.dropbox.com/scl/fo/hg3vbw3hzbvyuuhu4fjc6/ALrZ6rUe_9qcKqNgN5Lq7Hg?rlkey=bv40dlw2r4n5wu5adbsxklun0&e=1&dl=0).
@@ -182,6 +183,16 @@ After training, an output folder is automatically created in the root directory 
   - `meta`: A folder containing a `yaml` file with all the hyperparameters used for the current run.
   - `analysis`: contains the learned novelty threshold seperating the in-distribution set(Familiar) from the out of distribution set (Novel).
   - `figures`: some figures are saved containing the Normalized Levenstein Distance NLD, distribution per split.
+
+## Novelty Prediction
+A KNN graph is trained per model taking as an input the embeddings of all the RNAs used for training. Following that, different validation RNA sets (with familiar and novel ground truths) are used to learn a threshold seperating "novel" RNAs from "familiar" RNAs. Familiar meaning RNAs belonging to sub classes, the model has encountered during training while novel is the opposite. This learned threshold is the Normalized Levenshtein Distance threshold, NLD which can be interpreted as the %of nucleotide difference to make the query sequence be identical to the closest match (Explanatory sequence) found by the KNN model. A score of a query sequence above that threshold will consider query sequence as Novel, otherwise familiar.
+Refer to this [script](https://github.com/gitHBDX/TransfoRNA/blob/master/transforna/src/novelty_prediction/id_vs_ood_nld_clf.py) for more details on how this is done.
+Note:
+- Each model folder contains a trained knn graph under `model_name/post_model/knn_model.sav`.
+- The learned NLD threshold is logged per model at `model_name/analysis/novelty_model_coef.yaml`
+- To use the model directly, adapt this function `transforna/utils/utils.py/get_closest_neighbors`
+- All [Inference](#inference) output contains the output of the novelty prediction.
+  
 
 
 
