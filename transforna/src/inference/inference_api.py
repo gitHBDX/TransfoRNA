@@ -61,9 +61,10 @@ def read_inference_model_config(model:str,mc_or_sc,trained_on:str,path_to_models
     if trained_on == "full":
         transforna_folder = "TransfoRNA_FULL"
 
-    model_path = f"{path_to_models}/{transforna_folder}/{mc_or_sc}/{model}/meta/hp_settings.yaml"
-    cfg = OmegaConf.load(model_path)
-    return cfg
+    model_path = f"{path_to_models}/{transforna_folder}/{mc_or_sc}/{model}"
+    hp_settings_path = model_path + "/meta/hp_settings.yaml"
+    cfg = OmegaConf.load(hp_settings_path)
+    return cfg, model_path
 
 def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:str='sub_class',\
                     logits_flag:bool = False,attention_flag:bool = False,\
@@ -91,12 +92,11 @@ def predict_transforna(sequences: List[str], model: str = "Seq-Rev", mc_or_sc:st
     assert sum([logits_flag,attention_flag,similarity_flag,embedds_flag,umap_flag]) <= 1, 'One option at most can be True'
     # capitalize the first letter of the model and the first letter after the -
     model = "-".join([word.capitalize() for word in model.split("-")])
-    cfg = read_inference_model_config(model,mc_or_sc,trained_on,path_to_models)
+    cfg,model_path = read_inference_model_config(model,mc_or_sc,trained_on,path_to_models)
     cfg = update_config_with_inference_params(cfg,mc_or_sc,trained_on,path_to_models)
-    root_dir = Path(__file__).parents[1].absolute()
 
     with redirect_stdout(None):
-        cfg, net = get_model(cfg, root_dir)
+        cfg, net = get_model(cfg, model_path)
         #original_infer_pd might include seqs that are longer than input model. if so, infer_pd contains the trimmed sequences
         infer_pd = pd.Series(sequences, name="Sequences").to_frame()
         predicted_labels, logits, gene_embedds_df,attn_scores_pd,all_data, max_len, net,_  = infer_from_pd(cfg, net, infer_pd, SeqTokenizer,attention_flag)
