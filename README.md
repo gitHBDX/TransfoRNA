@@ -7,6 +7,11 @@ TransfoRNA can be trained on just the RNA sequences and optionally on additional
 
 Downloading the data used for training and the trained models can be done from [here](https://www.dropbox.com/scl/fo/hg3vbw3hzbvyuuhu4fjc6/ALrZ6rUe_9qcKqNgN5Lq7Hg?rlkey=bv40dlw2r4n5wu5adbsxklun0&e=1&dl=0).
 
+## Sections: 
+- [Data Availability](#data-availability)
+- [Dataset](#dataset)
+- [Models](#models)
+- [Repo Structure](#repo-structure)
  ## Data Availability
   The data folder wil be containing three subfolders (should be kept on the same folder level as `transforna`):
   - `data`:  Contains three files:
@@ -21,7 +26,7 @@ Downloading the data used for training and the trained models can be done from [
   - `kba_pipeline`: contains mapping reference data required to run the knowledge based pipeline manually
 
 
-## Dataset (Objective):
+## Dataset:
 - **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs classification performance 
   - Sequences are annotated based on a knowledge-based annotation approach that provides annotations for ~2k different sub-classes belonging to 11 major classes.
   - Knowledge-based annotations are divided into three sets of varying confidence levels: a **high-confidence (HICO)** set, a **low-confidence (LOCO)** set, and a **non-annotated (NA)** set for sequences that could not be annotated at all. Only HICO annotations are used for training.
@@ -158,4 +163,5 @@ The structure of the output folder is chosen by hydra to be `/day/time/results f
 ## Additional Datasets (Objective):
 - sncRNA, collected from [RFam](https://rfam.org/) (classification of RNA precursors into 13 classes)
 - premiRNA [human miRNAs](http://www.mirbase.org)(classification of true vs pseudo precursors)
-  
+
+### Place 2
