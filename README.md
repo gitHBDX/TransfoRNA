@@ -14,7 +14,7 @@ Downloading the data used for training and the trained models can be done from [
 
 
 ## Sections: 
-- [Visualize RNAs (External link)](www.transforna.com)
+- [Visualize RNAs (External link)](https://www.transforna.com)
 - [Downloaded Folder](#downloaded-folder)
 - [Datasets](#datasets)
 - [Models](#models)
