@@ -10,7 +10,7 @@ setup(
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Biological Researchers',
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Programming Language :: Python :: 3.9',
     ],
     packages=find_packages(include=['transforna', 'transforna.*']),
@@ -30,7 +30,7 @@ setup(
         "scanpy==1.9.1",
         "scikit_learn==1.2.0",
         "skorch==0.12.1",
-        "torch==1.10.1",
+        "torch==1.10.1+cu113",
         "tensorboard==2.16.2",
         "Levenshtein==0.21.0",
         "huggingface_hub==0.23.3",
