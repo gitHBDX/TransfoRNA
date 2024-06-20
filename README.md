@@ -14,7 +14,7 @@ Downloading the data used for training and the trained models can be done from [
 
 
 ## Sections: 
-- [Visualize RNAs](#visualize-rnas)
+- [Visualize RNAs (External link)](www.transforna.com)
 - [Downloaded Folder](#downloaded-folder)
 - [Datasets](#datasets)
 - [Models](#models)
@@ -22,9 +22,6 @@ Downloading the data used for training and the trained models can be done from [
 - [Installation](#installation)
 - [Inference](#inference)
 - [Train](#train)
-
- ## Visualize RNAs
- Embeddings of RNAs collected from two different [datasets](#datasets); TCGA and inhouse sequenced LC (lung cancer) data can be visualized on our hosted portal [here](www.transforna.com)
  
  ## Downloaded folder
   The data folder wil be containing three subfolders (should be kept on the same folder level as `transforna`):
