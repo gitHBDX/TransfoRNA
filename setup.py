@@ -39,6 +39,7 @@ setup(
     ],
     #add dependency link for torch
     dependency_links=[
+        "https://download.pytorch.org/whl/cu113/torch_stable.html",
         "https://download.pytorch.org/whl/cu113",
         "https://download.pytorch.org/whl/cu113/torch-1.10.1%2Bcu113-cp39-cp39-linux_x86_64.whl"
     ],
