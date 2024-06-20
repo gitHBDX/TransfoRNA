@@ -1,22 +1,31 @@
-# TransfoRNA
+# TransfoRNA 
 TransfoRNA is a **bioinformatics** and **machine learning** tool based on **Transformers** to provide annotations for 11 major classes (miRNA, rRNA, tRNA, snoRNA, protein 
 -coding/mRNA, lncRNA, YRNA, piRNA, snRNA, snoRNA and vtRNA) and 1923 sub-classes 
-for **human small RNAs and RNA fragments**. These are typically detected by RNA-seq NGS (next generation sequencing) data.
+for **human small RNAs and RNA fragments**. These are typically detected by RNA-Seq NGS (next generation sequencing) data. 
+
+Embeddings of RNAs collected from two different [datasets](#datasets); TCGA and inhouse sequenced LC (lung cancer) data can be visualized on our hosted portal [here](www.transforna.com)
+
 
 TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. Using TransfoRNA's framewok, the high confidence annotations in the TCGA dataset can be increased by 3 folds.
 
+
 Downloading the data used for training and the trained models can be done from [here](https://www.dropbox.com/scl/fo/hg3vbw3hzbvyuuhu4fjc6/ALrZ6rUe_9qcKqNgN5Lq7Hg?rlkey=bv40dlw2r4n5wu5adbsxklun0&e=1&dl=0).
 
+
+
 ## Sections: 
+- [Visualize RNAs](#visualize-rnas)
 - [Downloaded Folder](#downloaded-folder)
-- [Dataset](#dataset)
+- [Datasets](#datasets)
 - [Models](#models)
 - [Repo Structure](#repo-structure)
 - [Installation](#installation)
 - [Inference](#inference)
 - [Train](#train)
 
-  
+ ## Visualize RNAs
+ Embeddings of RNAs collected from two different [datasets](#datasets); TCGA and inhouse sequenced LC (lung cancer) data can be visualized on our hosted portal [here](www.transforna.com)
+ 
  ## Downloaded folder
   The data folder wil be containing three subfolders (should be kept on the same folder level as `transforna`):
   - `data`:  Contains three files:
@@ -31,8 +40,8 @@ Downloading the data used for training and the trained models can be done from [
   - `kba_pipeline`: contains mapping reference data required to run the knowledge based pipeline manually
 
 
-## Dataset:
-- TCGA: **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to evaluate TransfoRNAs classification performance 
+## Datasets:
+- TCGA: **The Cancer Genome Atlas, [TCGA](https://www.cancer.gov/about-nci/organization/ccg/research/structural-genomics/tcga)** offers sequencing data of small RNAs and is used to train and evaluate TransfoRNAs classification performance 
   - Sequences are annotated based on a knowledge-based annotation approach that provides annotations for ~2k different sub-classes belonging to 11 major classes.
   - Knowledge-based annotations are divided into three sets of varying confidence levels: a **high-confidence (HICO)** set, a **low-confidence (LOCO)** set, and a **non-annotated (NA)** set for sequences that could not be annotated at all. Only HICO annotations are used for training.
   - HICO RNAs cover ~2k sub-classes and constitute 19.6% of all RNAs found in TCGA. LOCO and NA sets comprise 66.9% and 13.6% of RNAs, respectively.
@@ -40,6 +49,8 @@ Downloading the data used for training and the trained models can be done from [
     - Criteria for ID and OOD:  Sub-class containing more than 8 sequences are considered ID, otherwise OOD.
   - An additional **putative 5' adapter affixes set** contains 294 sequences known to be technical artefacts. The 5’-end perfectly matches the last five or more nucleotides of the 5’-adapter sequence, commonly used in small RNA sequencing.
   - The knowledge-based annotation (KBA) pipline including installation guide is located under `kba_pipline`
+- LC: NGS sequencing data from a clinical lung cancer (LC) [study](https://www.jto.org/article/S1556-0864(23)00670-6/fulltext)
+  - This dataset was only used for validation. 
 - Additional Datasets:
     - sncRNA, collected from [RFam](https://rfam.org/) (classification of RNA precursors into 13 classes)
     - premiRNA [human miRNAs](http://www.mirbase.org)(classification of true vs pseudo precursors)
