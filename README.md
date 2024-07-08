@@ -3,7 +3,7 @@ TransfoRNA is a **bioinformatics** and **machine learning** tool based on **Tran
 -coding/mRNA, lncRNA, YRNA, piRNA, snRNA, snoRNA and vtRNA) and 1923 sub-classes 
 for **human small RNAs and RNA fragments**. These are typically detected by RNA-Seq NGS (next generation sequencing) data. 
 
-Embeddings of RNAs collected from two different [datasets](#datasets); TCGA and inhouse sequenced LC (lung cancer) data can be visualized on our hosted portal [here](www.transforna.com)
+Embeddings of RNAs collected from two different [datasets](#datasets); TCGA and inhouse sequenced LC (lung cancer) data can be visualized on our hosted portal [here](https://www.transforna.com)
 
 
 TransfoRNA can be trained on just the RNA sequences and optionally on additional information such as secondary structure. The result is a major and sub-class assignment combined with a novelty score (Normalized Levenshtein Distance) that quantifies the difference between the query sequence and the closest match found in the training set. Based on that it decides if the query sequence is novel or familiar. TransfoRNA uses a small curated set of ground truth labels obtained from common knowledge-based bioinformatics tools that map the sequences to transcriptome databases and a reference genome. Using TransfoRNA's framewok, the high confidence annotations in the TCGA dataset can be increased by 3 folds.
