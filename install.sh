@@ -8,9 +8,10 @@ while [[ "$CONDA_DEFAULT_ENV" != "base" ]]; do
     conda deactivate
 done
 
-#if conde transforna not found in the list of environments, then create the environment
+#if conda transforna not found in the list of environments, then create the environment
 if [[ $(conda env list | grep "transforna") == "" ]]; then
     conda create -n transforna python=$python_version -y
+    conda env update -n transforna --file environment.x86_64-linux.yml
     conda activate transforna
     conda install -c anaconda setuptools -y
 
