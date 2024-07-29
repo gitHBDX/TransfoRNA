@@ -1,3 +1,3 @@
 infere_original_testset: false
-model_path: /nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/TransfoRNA_FULL/sub_class/Seq/ckpt/model_params_tcga.pt
-sequences_path: /nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/data/inference_set.csv
+model_path: /media/ftp_share/hbdx/analysis/transforna_LC/TransfoRNA_FULL/sub_class/Seq/ckpt/model_params_tcga.pt
+sequences_path: /media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/2024-06-28__240627_slovakia_all_tubes/seqs.fa

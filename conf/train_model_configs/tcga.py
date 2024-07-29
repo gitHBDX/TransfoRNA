@@ -59,9 +59,9 @@ class GeneEmbeddModelConfig(PretrainedConfig):
 
 @dataclass
 class GeneEmbeddTrainConfig:
-    dataset_path_train: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/TCGA__ngs__miRNA_log2RPM-24.06.0__var.csv'
-    precursor_file_path: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/HBDxBase.csv'
-    mapping_dict_path: str = '/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/subclass_to_annotation.json'
+    dataset_path_train: str = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/HBDxBase_annotation/TransfoRNA/compare_binning_strategies/v06/2024-06-06__230126_LC_DI_HB_GEL_v23.01.00/sRNA_anno_aggregated_on_seq.csv' #'/data/hbdx_ldap_local/analysis/data/transforna_LC/LC__ngs__DI_HB_GEL-24.07.0.h5ad' #'/data/hbdx_ldap_local/analysis/data/LC_DI_HB_GEL/LC__ngs__DI_HB_GEL-24.04.0.h5ad'
+    precursor_file_path: str = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/mapping_reference/HBDxBase/HBDxBase_all_v4.csv' #'/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/HBDxBase.csv' #if not provided, sampling from the precurosr will not be done
+    mapping_dict_path: str = '/media/ftp_share/hbdx/annotation/feature_annotation/ANNOTATION/data_TCGA/annot_tmp/sRNA_class_subtypes_dict_v9.json' #'/media/ftp_share/hbdx/data_for_upload/TransfoRNA/data/subclass_to_annotation.json'
     device: str = "cpu"
     l2_weight_decay: float = 0.05
     batch_size: int = 512

@@ -8,7 +8,7 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from transforna import compute_cv, infer_benchmark, infer_tcga, train
+from src import compute_cv, infer_benchmark, infer_tcga, train
 
 warnings.filterwarnings("ignore")
 

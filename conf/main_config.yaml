@@ -15,8 +15,8 @@ model_config:
 #train settings
 model_name: seq #seq, seq-seq, seq-struct, seq-reverse, or baseline
 trained_on: full #full(production, more coverage) or id (for test/eval purposes)
-path_to_models: /nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/models/tcga/ #edit path to point to models/tcga/ directory: will be used if trained_on is full
-inference: False   # Should TransfoRNA be used for inference or train? True or False
+path_to_models: /media/ftp_share/hbdx/analysis/transforna_LC/ #edit path to point to models/tcga/ directory: will be used if trained_on is full
+inference: True   # Should TransfoRNA be used for inference or train? True or False
 #if inference is true, should the logits be logged?
 log_logits: False
 
@@ -40,9 +40,9 @@ tensorboard: False  # True or False
 #disable hydra output
 hydra:  
   run:  
-    dir: ./outputs/${now:%Y-%m-%d}/${model_name}
+    dir: /media/ftp_share/hbdx/analysis/transforna_LC/TransfoRNA_FULL/sub_class/${model_name} #./outputs/${now:%Y-%m-%d}/${model_name} # 
   searchpath: 
-   - file:///nfs/home/yat_ldap/VS_Projects/TransfoRNA-Framework/conf
+   - file:///nfs/home/jje_ldap/TransfoRNA/conf/train_model_configs/
 #  output_subdir: null  #uncomment to disable hydra output
 
 

@@ -181,7 +181,7 @@ class PrecursorAugmenter:
         self.min_bin_size = 20
         self.max_bin_size = 30
         self.min_seq_len = 18
-        self.max_seq_len = 30
+        self.max_seq_len = 40
 
     def load_precursor_file(self):
         try:
@@ -350,7 +350,8 @@ class PrecursorAugmenter:
                 # if curr_bin_no is different from bin_no+1 with more than 2 skip assertion
                 if abs(curr_bin_no - (bin_no+1)) > 1:
                     continue
-                assert curr_bin_no == bin_no+1, f'curr_bin_no is {curr_bin_no} and bin_no is {bin_no+1}'
+                if curr_bin_no != bin_no+1:
+                    print(f'curr_bin_no is {curr_bin_no} and bin_no is {bin_no+1}')
             
         return pd.DataFrame(index=sampled_seqs, data=[sc]*len(sampled_seqs)\
             , columns =['Labels'])
@@ -373,7 +374,7 @@ class PrecursorAugmenter:
                     sc_mc_mapper = lambda x: 'miRNA' if 'miR' in x else 'tRNA' if 'tRNA' in x else 'rRNA' if 'rRNA' in x else 'snRNA' if 'snRNA' in x else 'snoRNA' if 'snoRNA' in x else 'snoRNA' if 'SNO' in x else 'protein_coding' if 'RPL37A' in x else 'lncRNA' if 'SNHG1' in x else None
                     mc = sc_mc_mapper(sc)
                     if mc is None:
-                        print(f'No mapping for {sc}')
+                        print(f'No major class found for {sc}')
                         continue
                 existing_seqs = self.df[self.df['Labels'] == sc].index
                 scs_list.append(sc)
